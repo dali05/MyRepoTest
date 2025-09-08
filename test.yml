@@ -1,16 +1,16 @@
-version: '3.8'
-services:
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    container_name: local-kafka
-    ports:
-      - "9092:9092"
-      - "9093:9093"
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      CLUSTER_ID: my-cluster-id
+# Start Kafka if not running
+if [ "$(is_running local-kafka)" != "true" ]; then
+  echo "Starting Kafka..."
+  docker run -d --name local-kafka \
+    -p 9092:9092 -p 9093:9093 \
+    -e KAFKA_NODE_ID=1 \
+    -e KAFKA_PROCESS_ROLES=broker,controller \
+    -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
+    -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
+    -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+    -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 \
+    -e CLUSTER_ID=my-cluster-id \
+    ${KAFKA_IMAGE_NAME}
+else
+  echo "Kafka is already running."
+fi
