@@ -1,5 +1,11 @@
-kafka-topics --create --topic test-topic --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+docker run -d --name local-kafka \
+  -p 9092:9092 \
+  -e KAFKA_NODE_ID=1 \
+  -e KAFKA_PROCESS_ROLES=broker,controller \
+  -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093 \
+  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
+  -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+  -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 \
+  -e CLUSTER_ID=my-cluster-id \
+  confluentinc/cp-kafka:latest
 
-kafka-console-consumer --topic test-topic --bootstrap-server localhost:9092 --from-beginning
-docker exec -it local-kafka bash
-kafka-console-producer --topic test-topic --bootstrap-server localhost:9092
