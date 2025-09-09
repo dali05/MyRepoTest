@@ -1,1 +1,3 @@
-kubectl -n ns-kubernetes-dashboard get secret admin-user-token -o jsonpath="{.data.token}" | base64 --decode
+kubectl create clusterrolebinding admin-user \
+  --clusterrole=cluster-admin \
+  --serviceaccount=ns-kubernetes-dashboard:admin-user
