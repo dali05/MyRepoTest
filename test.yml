@@ -1,8 +1,8 @@
-kubectl -n ns-kubernetes-dashboard create serviceaccount admin-user
-kubectl -n ns-kubernetes-dashboard create clusterrolebinding admin-user \
-  --clusterrole=cluster-admin --serviceaccount=ns-kubernetes-dashboard:admin-user
-
-
-kubectl -n ns-kubernetes-dashboard get secret \
-  $(kubectl -n ns-kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") \
-  -o go-template="{{.data.token | base64decode}}"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user-token
+  namespace: ns-kubernetes-dashboard
+  annotations:
+    kubernetes.io/service-account.name: "admin-user"
+type: kubernetes.io/service-account-token
