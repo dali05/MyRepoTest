@@ -1,12 +1,151 @@
-docker run -d --name local-kafka \
-  -p 9092:9092 -p 9093:9093 -p 9094:9094 \
-  --add-host=host.docker.internal:host-gateway \
-  -e KAFKA_NODE_ID=1 \
-  -e KAFKA_PROCESS_ROLES=broker,controller \
-  -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_EXT:PLAINTEXT \
-  -e KAFKA_LISTENERS=CONTROLLER://:9094,PLAINTEXT://:9092,PLAINTEXT_INTERNAL://:29092,PLAINTEXT_EXT://:9093 \
-  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,PLAINTEXT_EXT://host.docker.internal:9093,PLAINTEXT_INTERNAL://broker:29092 \
-  -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
-  -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9094 \
-  -e CLUSTER_ID=my-cluster-id \
-  confluentinc/cp-kafka:latest
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=10MB
+
+# Config MinIO
+cloud.aws.s3.endpoint=http://127.0.0.1:9000
+cloud.aws.s3.region=us-east-1
+cloud.aws.credentials.access-key=admin
+cloud.aws.credentials.secret-key=password123
+
+
+   <dependency>
+      <groupId>io.minio</groupId>
+      <artifactId>minio</artifactId>
+      <version>8.5.11</version>
+    </dependency>
+
+
+    package demo.minio;
+
+import io.minio.MinioClient;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
+
+@SpringBootApplication
+public class Application {
+
+  @Bean
+  MinioClient minioClient(
+      @Value("${minio.url}") String url,
+      @Value("${minio.access-key}") String accessKey,
+      @Value("${minio.secret-key}") String secretKey) {
+    return MinioClient.builder()
+        .endpoint(url)
+        .credentials(accessKey, secretKey)
+        .build();
+  }
+
+  public static void main(String[] args) {
+    SpringApplication.run(Application.class, args);
+  }
+}
+
+
+package demo.minio;
+
+import io.minio.*;
+import io.minio.errors.MinioException;
+import io.minio.messages.Bucket;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import jakarta.annotation.PostConstruct;
+import java.io.InputStream;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+@Service
+public class StorageService {
+
+  private final MinioClient minio;
+  private final String bucket;
+
+  public StorageService(MinioClient minio, @Value("${minio.bucket}") String bucket) {
+    this.minio = minio;
+    this.bucket = bucket;
+  }
+
+  @PostConstruct
+  public void ensureBucketExists() throws Exception {
+    boolean exists = minio.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+    if (!exists) {
+      minio.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
+    }
+  }
+
+  public void upload(String objectName, InputStream stream, long size, String contentType) throws Exception {
+    PutObjectArgs args = PutObjectArgs.builder()
+        .bucket(bucket)
+        .object(objectName)
+        .stream(stream, size, -1)
+        .contentType(contentType != null ? contentType : "application/octet-stream")
+        .build();
+    minio.putObject(args);
+  }
+
+  public InputStream download(String objectName) throws Exception {
+    return minio.getObject(GetObjectArgs.builder().bucket(bucket).object(objectName).build());
+  }
+
+  public List<String> list() throws Exception {
+    Iterable<Result<Item>> results = minio.listObjects(ListObjectsArgs.builder().bucket(bucket).build());
+    return StreamSupport.stream(results.spliterator(), false)
+        .map(r -> {
+          try { return r.get().objectName(); } catch (Exception e) { throw new RuntimeException(e); }
+        })
+        .collect(Collectors.toList());
+  }
+}
+
+
+
+package demo.minio;
+
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.StringUtils;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+@RestController
+@RequestMapping("/files")
+public class FileController {
+
+  private final StorageService storage;
+
+  public FileController(StorageService storage) {
+    this.storage = storage;
+  }
+
+  @GetMapping
+  public List<String> list() throws Exception {
+    return storage.list();
+  }
+
+  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<String> upload(@RequestPart("file") MultipartFile file,
+                                       @RequestParam(value = "name", required = false) String name) throws Exception {
+    String objectName = StringUtils.hasText(name) ? name : file.getOriginalFilename();
+    if (!StringUtils.hasText(objectName)) objectName = "upload.bin";
+    storage.upload(objectName, file.getInputStream(), file.getSize(), file.getContentType());
+    return ResponseEntity.ok(objectName);
+  }
+
+  @GetMapping("/{objectName}")
+  public ResponseEntity<byte[]> download(@PathVariable String objectName) throws Exception {
+    try (var is = storage.download(objectName)) {
+      byte[] bytes = is.readAllBytes();
+      String encoded = URLEncoder.encode(objectName, StandardCharsets.UTF_8);
+      return ResponseEntity.ok()
+          .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
+          .contentType(MediaType.APPLICATION_OCTET_STREAM)
+          .body(bytes);
+    }
+  }
+}
