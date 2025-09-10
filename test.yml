@@ -1,28 +1,11 @@
-<dependencyManagement>
-  <dependencies>
-    <dependency>
-      <groupId>org.springframework.cloud</groupId>
-      <artifactId>spring-cloud-dependencies</artifactId>
-      <version>2023.0.3</version> <!-- adapte selon ta version Spring Boot -->
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
-  </dependencies>
-</dependencyManagement>
+-- Donne l’usage du schéma
+GRANT USAGE ON SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
 
-<dependencies>
-  <dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-data-jpa</artifactId>
-  </dependency>
+-- Donne les droits de création dans le schéma
+GRANT CREATE ON SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
 
-  <dependency>
-    <groupId>org.postgresql</groupId>
-    <artifactId>postgresql</artifactId>
-  </dependency>
+-- Donne tous les droits sur les tables existantes du schéma
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
 
-  <dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-vault-config</artifactId>
-  </dependency>
-</dependencies>
+-- Donne tous les droits sur les séquences (nécessaires pour les ID auto-incrémentés)
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
