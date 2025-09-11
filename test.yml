@@ -1,194 +1,35 @@
-{
-  "type": "record",
-  "name": "UserEvent",
-  "namespace": "com.example.avro",
-  "fields": [
-    {
-      "name": "userId",
-      "type": "string"
-    },
-    {
-      "name": "action",
-      "type": {
-        "type": "enum",
-        "name": "ActionType",
-        "symbols": ["LOGIN", "LOGOUT", "PURCHASE"]
-      }
-    },
-    {
-      "name": "timestamp",
-      "type": "long",
-      "logicalType": "timestamp-millis"
-    }
-  ]
-}
-
-
-<dependencies>
-    <!-- Spring Boot -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter</artifactId>
-    </dependency>
-
-    <!-- Kafka -->
-    <dependency>
-        <groupId>org.springframework.kafka</groupId>
-        <artifactId>spring-kafka</artifactId>
-    </dependency>
-
-    <!-- Avro -->
-    <dependency>
-        <groupId>org.apache.avro</groupId>
-        <artifactId>avro</artifactId>
-        <version>1.11.3</version>
-    </dependency>
-
-    <!-- Confluent Kafka Avro serializer -->
-    <dependency>
-        <groupId>io.confluent</groupId>
-        <artifactId>kafka-avro-serializer</artifactId>
-        <version>7.6.0</version>
-    </dependency>
-</dependencies>
-
-<build>
-    <plugins>
-        <!-- Générer les classes Java à partir des schémas Avro -->
-        <plugin>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>avro-maven-plugin</artifactId>
-            <version>1.11.3</version>
-            <executions>
-                <execution>
-                    <phase>generate-sources</phase>
-                    <goals>
-                        <goal>schema</goal>
-                    </goals>
-                    <configuration>
-                        <sourceDirectory>${project.basedir}/src/main/avro</sourceDirectory>
-                        <outputDirectory>${project.basedir}/target/generated-sources/avro</outputDirectory>
-                    </configuration>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
-</build>
-
-
-spring:
-  kafka:
-    bootstrap-servers: localhost:9092
-    properties:
-      schema.registry.url: http://localhost:8081
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
-    consumer:
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
-      group-id: user-event-consumer
-      properties:
-        specific.avro.reader: true
-
-
-package com.example.avro;
-
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.stereotype.Service;
-import java.time.Instant;
-
-@Service
-public class UserEventProducer {
-
-    private final KafkaTemplate<String, UserEvent> kafkaTemplate;
-
-    public UserEventProducer(KafkaTemplate<String, UserEvent> kafkaTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
-    }
-
-    public void sendUserEvent(String userId, UserEvent.ActionType action) {
-        // Création d’un message valide selon le schéma Avro
-        UserEvent event = UserEvent.newBuilder()
-                .setUserId(userId)
-                .setAction(action)
-                .setTimestamp(Instant.now().toEpochMilli())
-                .build();
-
-        // Envoi dans Kafka (le serializer Avro valide le schéma automatiquement)
-        kafkaTemplate.send("user-events", userId, event);
-        System.out.println("✅ Event envoyé: " + event);
-    }
-}
-
-
-
-package com.example.avro;
-
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.stereotype.Service;
-
-@Service
-public class UserEventConsumer {
-
-    @KafkaListener(topics = "user-events", groupId = "user-event-consumer")
-    public void consume(ConsumerRecord<String, UserEvent> record) {
-        UserEvent event = record.value();
-        System.out.println("📥 Event reçu: " + event);
-    }
-}
-
-
-
-package com.example.avro;
-
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class AvroKafkaApp implements CommandLineRunner {
-
-    private final UserEventProducer producer;
-
-    public AvroKafkaApp(UserEventProducer producer) {
-        this.producer = producer;
-    }
-
-    public static void main(String[] args) {
-        SpringApplication.run(AvroKafkaApp.class, args);
-    }
-
-    @Override
-    public void run(String... args) {
-        producer.sendUserEvent("user123", UserEvent.ActionType.LOGIN);
-        producer.sendUserEvent("user456", UserEvent.ActionType.PURCHASE);
-    }
-}
-
-
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import jakarta.annotation.PostConstruct;
-
-@Component
-public class VaultDebug {
-
-    @Value("${spring.datasource.username}")
-    private String dbUser;
-
-    @Value("${spring.datasource.password}")
-    private String dbPassword;
-
-    @PostConstruct
-    public void printVaultCredentials() {
-        System.out.println("🔑 Vault DB User: " + dbUser);
-        System.out.println("🔑 Vault DB Password: " + dbPassword);
-    }
-}
-
-
-
-
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schema-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: schema-registry
+  template:
+    metadata:
+      labels:
+        app: schema-registry
+    spec:
+      containers:
+        - name: schema-registry
+          image: confluentinc/cp-schema-registry:7.6.0
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+              value: PLAINTEXT://kafka:9092   # adapte au nom de ton service Kafka
+            - name: SCHEMA_REGISTRY_LISTENERS
+              value: http://0.0.0.0:8081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: schema-registry
+spec:
+  selector:
+    app: schema-registry
+  ports:
+    - port: 8081
+      targetPort: 8081
