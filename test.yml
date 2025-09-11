@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: schema-registry
+  namespace: ns-schema-registry   # ✅ nouveau namespace
 spec:
   replicas: 1
   selector:
@@ -19,7 +20,7 @@ spec:
             - containerPort: 8081
           env:
             - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
-              value: PLAINTEXT://kafka:9092   # adapte au nom de ton service Kafka
+              value: PLAINTEXT://kafka:9092   # ⚠️ adapte au nom de ton service Kafka
             - name: SCHEMA_REGISTRY_LISTENERS
               value: http://0.0.0.0:8081
 ---
@@ -27,6 +28,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: schema-registry
+  namespace: ns-schema-registry   # ✅ même namespace
 spec:
   selector:
     app: schema-registry
