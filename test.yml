@@ -1,11 +1,1 @@
--- Donne l’usage du schéma
-GRANT USAGE ON SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
-
--- Donne les droits de création dans le schéma
-GRANT CREATE ON SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
-
--- Donne tous les droits sur les tables existantes du schéma
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
-
--- Donne tous les droits sur les séquences (nécessaires pour les ID auto-incrémentés)
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
+Lease ID: database/postgres/pg0000000/creds/app_pg0000000_ibmclouddb/XXXXXXXX tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
