@@ -1,1 +1,4 @@
-Lease ID: database/postgres/pg0000000/creds/app_pg0000000_ibmclouddb/XXXXXXXX tb_person TO "v-userpass-own_pg0000000_ibmclouddb";
+kubectl config set-context <context-name> \
+  --cluster=<cluster-name> \
+  --user=<user-name> \
+  --namespace=<namespace>
