@@ -3,8 +3,8 @@ kind: StatefulSet
 metadata:
   name: kafka
   namespace: kafka
-labels:
-  app: kafka
+  labels:
+    app: kafka
 spec:
   serviceName: "kafka"
   replicas: 1
@@ -21,43 +21,55 @@ spec:
           image: bitnami/kafka:3.4.0
           ports:
             - containerPort: 9092
+            - containerPort: 9093
           env:
-            - name: KAFKA_BROKER_ID
-              value: "0"
+            # Autoriser PLAINTEXT
+            - name: ALLOW_PLAINTEXT_LISTENER
+              value: "yes"
+
+            # Mode KRaft
+            - name: KAFKA_CFG_PROCESS_ROLES
+              value: "broker,controller"
+
+            # Listeners (broker + controller)
             - name: KAFKA_CFG_LISTENERS
-              value: PLAINTEXT://:9092
-            - name: KAFKA_CFG_ADVERTISED_LISTENERS
-              value: PLAINTEXT://kafka:9092
+              value: PLAINTEXT://:9092,CONTROLLER://:9093
+
+            # Protocols
             - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
-              value: PLAINTEXT:PLAINTEXT
+              value: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+            # Inter-broker communication
             - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
               value: PLAINTEXT
-            - name: KAFKA_CFG_ZOOKEEPER_CONNECT
-              value: zookeeper:2181
-          volumeMounts:
-            - name: kafka-data
-              mountPath: /bitnami/kafka
-  volumeClaimTemplates:
-    - metadata:
-        name: kafka-data
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        resources:
-          requests:
-            storage: 1Gi
+
+            # Controller listener
+            - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+
+            # Pour que les clients (Schema Registry) se connectent
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS
+              value: PLAINTEXT://kafka:9092
+
+            # Identifiant unique pour le cluster
+            - name: KAFKA_KRAFT_CLUSTER_ID
+              value: "abcdefghijklmnopqrstuvwx"   # ⚠️ génère un UUID si tu veux
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: kafka
   namespace: kafka
-labels:
-  app: kafka
+  labels:
+    app: kafka
 spec:
   type: ClusterIP
   ports:
-    - name: kafka
+    - name: broker
       port: 9092
       targetPort: 9092
+    - name: controller
+      port: 9093
+      targetPort: 9093
   selector:
     app: kafka
