@@ -1,41 +1,10 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: schema-registry
-  namespace: kafka
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: schema-registry
-  template:
-    metadata:
-      labels:
-        app: schema-registry
-    spec:
-      containers:
-        - name: schema-registry
-          image: confluentinc/cp-schema-registry:7.6.0
-          ports:
-            - containerPort: 8081
-          env:
-            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
-              value: PLAINTEXT://kafka:9092
-            - name: SCHEMA_REGISTRY_HOST_NAME
-              value: schema-registry
-            - name: SCHEMA_REGISTRY_LISTENERS
-              value: http://0.0.0.0:8081
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: schema-registry
-  namespace: kafka
-spec:
-  type: NodePort
-  ports:
-    - port: 8081
-      targetPort: 8081
-      nodePort: 30002
-  selector:
-    app: schema-registry
+helm repo add akhq https://akhq.io/
+helm repo update
+helm install akhq akhq/akhq \
+  --namespace kafka \
+  --create-namespace \
+  --set secrets.kafka-clusters.0.name=local-kafka \
+  --set secrets.kafka-clusters.0.bootstrapServers=kafka:9092 \
+  --set service.type=NodePort \
+  --set service.nodePort=30003
+kubectl port-forward svc/akhq 8085:80 -n kafka
