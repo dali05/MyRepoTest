@@ -1,91 +1,44 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: kafka
-  namespace: kafka
-  labels:
-    app: kafka
-spec:
-  type: ClusterIP
-  ports:
-    - name: broker
-      port: 9092
-      targetPort: 9092
-    - name: controller
-      port: 9093
-      targetPort: 9093
-  selector:
-    app: kafka
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: kafka
-  namespace: kafka
-  labels:
-    app: kafka
-spec:
-  serviceName: "kafka"
-  replicas: 1
-  selector:
-    matchLabels:
-      app: kafka
-  template:
-    metadata:
-      labels:
-        app: kafka
-    spec:
-      containers:
-        - name: kafka
-          image: bitnami/kafka:3.4.0
-          ports:
-            - containerPort: 9092
-            - containerPort: 9093
-          env:
-            # Autoriser PLAINTEXT
-            - name: ALLOW_PLAINTEXT_LISTENER
-              value: "yes"
+image:
+  registry: docker.io
+  repository: bitnami/kafka
+  tag: 3.7.0-debian-11-r2
+  pullPolicy: IfNotPresent
 
-            # Mode KRaft (broker + controller)
-            - name: KAFKA_CFG_PROCESS_ROLES
-              value: "broker,controller"
+kraft:
+  enabled: true
+  clusterId: "a2Fma2EtY2x1c3Rlci1sb2NhbA=="   # base64("kafka-cluster-local")
+  processRoles: "broker,controller"
+  controllerQuorumVoters: "0@kafka-controller-0.kafka-controller-headless.kafka.svc.cluster.local:9093"
 
-            # Listeners pour broker et controller
-            - name: KAFKA_CFG_LISTENERS
-              value: PLAINTEXT://:9092,CONTROLLER://:9093
+zookeeper:
+  enabled: false
 
-            # Protocoles
-            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
-              value: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+broker:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 8Gi
 
-            # Listener utilisé entre brokers
-            - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
-              value: PLAINTEXT
+listeners:
+  client:
+    name: CLIENT
+    port: 9092
+    protocol: PLAINTEXT
+  internal:
+    name: INTERNAL
+    port: 9093
+    protocol: PLAINTEXT
+  external:
+    name: EXTERNAL
+    port: 9094
+    protocol: PLAINTEXT
 
-            # Listener utilisé par le controller
-            - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
-              value: CONTROLLER
-
-            # Pour les clients (Schema Registry, producteurs, consommateurs…)
-            - name: KAFKA_CFG_ADVERTISED_LISTENERS
-              value: PLAINTEXT://kafka:9092
-
-            # Cluster ID fixe (⚠️ change-le une seule fois si tu recrées tout)
-            - name: KAFKA_KRAFT_CLUSTER_ID
-              value: "5e3a2c8a-8e5a-4a3a-9f6b-52b1c3cfe8f3"
-
-            # Identifiant du broker
-            - name: KAFKA_BROKER_ID
-              value: "0"
-
-          volumeMounts:
-            - name: kafka-data
-              mountPath: /bitnami/kafka
-  volumeClaimTemplates:
-    - metadata:
-        name: kafka-data
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        resources:
-          requests:
-            storage: 1Gi
+externalAccess:
+  enabled: true
+  autoDiscovery:
+    enabled: true
+  broker:
+    service:
+      type: NodePort
+      nodePorts:
+        - 30992
