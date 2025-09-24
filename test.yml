@@ -1,43 +1,25 @@
-<dependencies>
-    <!-- MapStruct API -->
-    <dependency>
-        <groupId>org.mapstruct</groupId>
-        <artifactId>mapstruct</artifactId>
-        <version>1.5.5.Final</version>
-    </dependency>
-</dependencies>
-
-<build>
-    <plugins>
-        <!-- Annotation Processor pour générer le code MapStruct -->
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.11.0</version>
-            <configuration>
-                <source>17</source> <!-- adapte à ta version Java -->
-                <target>17</target>
-                <annotationProcessorPaths>
-                    <path>
-                        <groupId>org.mapstruct</groupId>
-                        <artifactId>mapstruct-processor</artifactId>
-                        <version>1.5.5.Final</version>
-                    </path>
-                </annotationProcessorPaths>
-            </configuration>
-        </plugin>
-    </plugins>
-</build>
-
-package com.bnpp.pf.mapper;
-
-import com.bnpp.pf.dto.UserDto;
-import com.bnpp.pf.entity.UserEntity;
-import org.mapstruct.Mapper;
-
 @Mapper(componentModel = "spring")
 public interface UserMapper {
-    UserEntity dtoToEntity(UserDto dto);
-    UserDto entityToDto(UserEntity entity);
-}
 
+    UserDto avroToDto(User user);
+
+    User dtoToAvro(UserDto dto);
+
+    // CharSequence <-> String
+    default String map(CharSequence value) {
+        return value == null ? null : value.toString();
+    }
+
+    default CharSequence map(String value) {
+        return value;
+    }
+
+    // Civilite enum <-> String
+    default String map(CiviliteSymbols civilite) {
+        return civilite == null ? null : civilite.name();
+    }
+
+    default CiviliteSymbols map(String civilite) {
+        return civilite == null ? null : CiviliteSymbols.valueOf(civilite);
+    }
+}
