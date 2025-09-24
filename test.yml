@@ -2,24 +2,23 @@
 public interface UserMapper {
 
     UserDto avroToDto(User user);
-
     User dtoToAvro(UserDto dto);
 
     // CharSequence <-> String
-    default String map(CharSequence value) {
+    default String charSequenceToString(CharSequence value) {
         return value == null ? null : value.toString();
     }
 
-    default CharSequence map(String value) {
+    default CharSequence stringToCharSequence(String value) {
         return value;
     }
 
     // Civilite enum <-> String
-    default String map(CiviliteSymbols civilite) {
+    default String civiliteEnumToString(CiviliteSymbols civilite) {
         return civilite == null ? null : civilite.name();
     }
 
-    default CiviliteSymbols map(String civilite) {
+    default CiviliteSymbols stringToCiviliteEnum(String civilite) {
         return civilite == null ? null : CiviliteSymbols.valueOf(civilite);
     }
 }
