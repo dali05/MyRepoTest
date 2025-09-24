@@ -1,44 +1,30 @@
-image:
-  registry: docker.io
-  repository: bitnami/kafka
-  tag: 3.7.0-debian-11-r2
-  pullPolicy: IfNotPresent
+<dependencies>
+    <!-- MapStruct API -->
+    <dependency>
+        <groupId>org.mapstruct</groupId>
+        <artifactId>mapstruct</artifactId>
+        <version>1.5.5.Final</version>
+    </dependency>
+</dependencies>
 
-kraft:
-  enabled: true
-  clusterId: "a2Fma2EtY2x1c3Rlci1sb2NhbA=="   # base64("kafka-cluster-local")
-  processRoles: "broker,controller"
-  controllerQuorumVoters: "0@kafka-controller-0.kafka-controller-headless.kafka.svc.cluster.local:9093"
-
-zookeeper:
-  enabled: false
-
-broker:
-  replicaCount: 1
-  persistence:
-    enabled: true
-    size: 8Gi
-
-listeners:
-  client:
-    name: CLIENT
-    port: 9092
-    protocol: PLAINTEXT
-  internal:
-    name: INTERNAL
-    port: 9093
-    protocol: PLAINTEXT
-  external:
-    name: EXTERNAL
-    port: 9094
-    protocol: PLAINTEXT
-
-externalAccess:
-  enabled: true
-  autoDiscovery:
-    enabled: true
-  broker:
-    service:
-      type: NodePort
-      nodePorts:
-        - 30992
+<build>
+    <plugins>
+        <!-- Annotation Processor pour générer le code MapStruct -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.11.0</version>
+            <configuration>
+                <source>17</source> <!-- adapte à ta version Java -->
+                <target>17</target>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>org.mapstruct</groupId>
+                        <artifactId>mapstruct-processor</artifactId>
+                        <version>1.5.5.Final</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
