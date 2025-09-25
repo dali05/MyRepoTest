@@ -1,44 +1,11 @@
-import io.swagger.v3.oas.annotations.OpenAPIDefinition;
-import io.swagger.v3.oas.annotations.info.Info;
-import io.swagger.v3.oas.annotations.info.Contact;
-import io.swagger.v3.oas.annotations.info.License;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-@OpenAPIDefinition(
-    info = @Info(
-        title = "API Wall-E",
-        version = "1.0",
-        description = "Documentation des API avec Swagger Core v3 - annotations 2.1.10",
-        contact = @Contact(name = "Support API", email = "support@monapp.com"),
-        license = @License(name = "Apache 2.0", url = "http://springdoc.org")
-    )
-)
-public class SwaggerConfig {
-}
-
-
-
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping("/api/hello")
-public class HelloController {
+@Controller
+public class SwaggerUiController {
 
-    @Operation(
-        summary = "Dire bonjour",
-        description = "Retourne un message de test",
-        responses = {
-            @ApiResponse(responseCode = "200", description = "Succès"),
-            @ApiResponse(responseCode = "500", description = "Erreur serveur")
-        }
-    )
-    @GetMapping
-    public String sayHello() {
-        return "Hello Swagger Core v3 avec annotations 2.1.10!";
+    @GetMapping("/swagger-ui")
+    public String redirectToUi() {
+        return "redirect:/webjars/swagger-ui/4.15.5/index.html?url=/v3/api-docs";
     }
 }
