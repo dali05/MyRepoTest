@@ -1,35 +1,41 @@
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
+<dependencies>
+    <!-- Annotations OpenAPI (swagger-annotations 2.1.10) -->
+    <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-annotations</artifactId>
+        <version>2.1.10</version>
+    </dependency>
 
-@Controller
-public class SwaggerUiController {
+    <!-- Springdoc OpenAPI pour Swagger UI -->
+    <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-ui</artifactId>
+        <version>1.6.15</version> <!-- ou la dernière 1.6.x -->
+    </dependency>
+</dependencies>
 
-    @GetMapping("/swagger-ui")
-    public String redirectToUi() {
-        return "redirect:/webjars/swagger-ui/4.15.5/index.html?url=/v3/api-docs";
-    }
-}
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/hello")
-public class HelloController {
+@RequestMapping("/api/users")
+public class UserController {
 
     @Operation(
-        summary = "Dire bonjour",
-        description = "Retourne un message de test",
+        summary = "Obtenir un utilisateur par ID",
+        description = "Retourne les informations détaillées d’un utilisateur.",
         responses = {
             @ApiResponse(responseCode = "200", description = "Succès"),
-            @ApiResponse(responseCode = "500", description = "Erreur serveur")
+            @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
         }
     )
-    @GetMapping
-    public String sayHello() {
-        return "Hello Swagger Core v3 avec annotations 2.1.10!";
+    @GetMapping("/{id}")
+    public User getUserById(
+            @Schema(description = "ID de l’utilisateur", example = "123")
+            @PathVariable Long id) {
+        return new User(id, "Alice", "alice@mail.com");
     }
 }
