@@ -1,41 +1,44 @@
-<dependencies>
-    <!-- Annotations OpenAPI (swagger-annotations 2.1.10) -->
-    <dependency>
-        <groupId>io.swagger.core.v3</groupId>
-        <artifactId>swagger-annotations</artifactId>
-        <version>2.1.10</version>
-    </dependency>
+image:
+  registry: docker.io
+  repository: bitnami/kafka
+  tag: 3.7.0-debian-11-r2
+  pullPolicy: IfNotPresent
 
-    <!-- Springdoc OpenAPI pour Swagger UI -->
-    <dependency>
-        <groupId>org.springdoc</groupId>
-        <artifactId>springdoc-openapi-ui</artifactId>
-        <version>1.6.15</version> <!-- ou la dernière 1.6.x -->
-    </dependency>
-</dependencies>
+kraft:
+  enabled: true
+  clusterId: "a2Fma2EtY2x1c3Rlci1sb2NhbA=="   # base64("kafka-cluster-local")
+  processRoles: "broker,controller"
+  controllerQuorumVoters: "0@kafka-controller-0.kafka-controller-headless.kafka.svc.cluster.local:9093"
 
+zookeeper:
+  enabled: false
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import org.springframework.web.bind.annotation.*;
+broker:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 8Gi
 
-@RestController
-@RequestMapping("/api/users")
-public class UserController {
+listeners:
+  client:
+    name: CLIENT
+    port: 9092
+    protocol: PLAINTEXT
+  internal:
+    name: INTERNAL
+    port: 9093
+    protocol: PLAINTEXT
+  external:
+    name: EXTERNAL
+    port: 9094
+    protocol: PLAINTEXT
 
-    @Operation(
-        summary = "Obtenir un utilisateur par ID",
-        description = "Retourne les informations détaillées d’un utilisateur.",
-        responses = {
-            @ApiResponse(responseCode = "200", description = "Succès"),
-            @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé")
-        }
-    )
-    @GetMapping("/{id}")
-    public User getUserById(
-            @Schema(description = "ID de l’utilisateur", example = "123")
-            @PathVariable Long id) {
-        return new User(id, "Alice", "alice@mail.com");
-    }
-}
+externalAccess:
+  enabled: true
+  autoDiscovery:
+    enabled: true
+  broker:
+    service:
+      type: NodePort
+      nodePorts:
+        - 30992
