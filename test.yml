@@ -1,3 +1,21 @@
-src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
-
-com.bnpp.pf.pfspringdoc.doc.SpringdocAutoConfiguration
+<plugin>
+  <groupId>org.apache.maven.plugins</groupId>
+  <artifactId>maven-enforcer-plugin</artifactId>
+  <version>3.5.0</version>
+  <executions>
+    <execution>
+      <id>enforce-bytecode-version</id>
+      <goals>
+        <goal>enforce</goal>
+      </goals>
+      <configuration>
+        <rules>
+          <enforceBytecodeVersion>
+            <maxJdkVersion>21</maxJdkVersion>
+          </enforceBytecodeVersion>
+        </rules>
+        <fail>true</fail>
+      </configuration>
+    </execution>
+  </executions>
+</plugin>
