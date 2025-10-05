@@ -1,17 +1,9 @@
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: logging
-
----
-
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: fluent-bit-config
   namespace: logging
 data:
-  # Fichier principal de configuration
   fluent-bit.conf: |
     [SERVICE]
         Flush         1
@@ -27,6 +19,7 @@ data:
         Mem_Buf_Limit     50MB
         Skip_Long_Lines   On
         Refresh_Interval  10
+        Parser            docker
 
     [FILTER]
         Name                kubernetes
@@ -37,13 +30,19 @@ data:
         K8S-Logging.Parser  On
         K8S-Logging.Exclude On
 
+    [FILTER]
+        Name          parser
+        Match         kube.*
+        Key_Name      log
+        Parser        json
+        Reserve_Data  On
+
     [OUTPUT]
         Name            es
         Match           *
         Host            192.168.1.116
         Port            9200
         Index           spring-logs
-        Type            flb_type
         Logstash_Format On
         HTTP_User       elastic
         HTTP_Passwd     changeme
@@ -51,7 +50,6 @@ data:
         Suppress_Type_Name On
         tls             Off
 
-  # Fichier des parsers
   parsers.conf: |
     [PARSER]
         Name        docker
@@ -68,53 +66,9 @@ data:
         Time_Format %Y-%m-%dT%H:%M:%S.%L%z
         Time_Keep   On
 
----
-
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: fluent-bit
-  namespace: logging
-  labels:
-    k8s-app: fluent-bit
-spec:
-  selector:
-    matchLabels:
-      k8s-app: fluent-bit
-  template:
-    metadata:
-      labels:
-        k8s-app: fluent-bit
-    spec:
-      serviceAccountName: fluent-bit
-      tolerations:
-        - operator: Exists
-      containers:
-        - name: fluent-bit
-          image: cr.fluentbit.io/fluent/fluent-bit:2.2
-          resources:
-            limits:
-              memory: 200Mi
-            requests:
-              cpu: 100m
-              memory: 100Mi
-          volumeMounts:
-            - name: varlog
-              mountPath: /var/log
-            - name: config
-              mountPath: /fluent-bit/etc/
-      volumes:
-        - name: varlog
-          hostPath:
-            path: /var/log
-        - name: config
-          configMap:
-            name: fluent-bit-config
-
----
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: fluent-bit
-  namespace: logging
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    @timestamp
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Time_Keep   On
