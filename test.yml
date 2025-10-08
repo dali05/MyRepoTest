@@ -1,3 +1,43 @@
-curl -u elastic:changeme -X POST "http://docker-elk-elasticsearch-1:9200/spring-logs/_doc" \
--H 'Content-Type: application/json' \
--d '{"message": "test log from fluent bit"}'
+# 🧱 Walle Common
+
+**Walle Common** is a **Spring Boot (Maven)** module that provides shared configurations and base components for all microservices in the **Walle** ecosystem.  
+It serves as a centralized foundation to ensure **consistency**, **maintainability**, and **code reuse** across all services.
+
+---
+
+## 🚀 Purpose
+
+The goal of `walle-common` is to avoid code duplication by centralizing the following aspects:
+- Exception management.
+- Standardized API response handling.
+- Logging configuration.
+- Swagger (OpenAPI) configuration.
+- Cross-cutting concerns used in all microservices.
+
+---
+
+## 🧩 Main Features
+
+### ⚙️ Exception Management
+- Centralized exception handling with custom exception classes (`BusinessException`, `NotFoundException`, etc.).
+- Global `@ControllerAdvice` to intercept and format errors.
+- Consistent error codes and messages across all services.
+
+### 📦 API Response Management
+- Generic response wrapper class (`ApiResponse<T>`) for consistent JSON responses.
+- Built-in status and message management.
+- Simplifies and standardizes API outputs.
+
+### 🧾 Swagger Configuration
+- Preconfigured **Springdoc OpenAPI / Swagger UI** integration.
+- Auto-generated API documentation.
+- Customizable project title, version, and description.
+
+### 🪵 Logging Configuration
+- Centralized **Logback** setup.
+- JSON log formatting for integration with monitoring tools (e.g., ELK, Graylog).
+- Common logging configuration (`logging.properties` or `logback-spring.xml`).
+
+---
+
+## 🧰 Project Structure
