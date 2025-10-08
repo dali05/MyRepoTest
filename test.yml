@@ -1,32 +1,22 @@
-walle-common/
+walle-backend-common/
 ├── src/
-│   ├── main/
-│   │   ├── java/com/walle/common/
-│   │   │   ├── exception/
-│   │   │   ├── response/
-│   │   │   ├── config/
-│   │   │   └── logging/
-│   │   └── resources/
-│   │       ├── application.yml
-│   │       └── logback-spring.xml
-│   └── test/
-│       └── …
+│   └── main/
+│       ├── java/
+│       │   └── com/bnpp/pf/pfspringpoc/
+│       │       ├── common/
+│       │       │   ├── api/
+│       │       │   ├── exception/
+│       │       │   ├── logging/
+│       │       │   └── web/
+│       │       ├── conf/
+│       │       └── doc/
+│       └── resources/
+│           ├── META-INF/spring/
+│           │   └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
+│           └── logback-spring.xml
 ├── pom.xml
-└── README.md
-
-
-
----
-
-## 🔗 Usage in Other Microservices
-
-### 1️⃣ Add the dependency to your microservice `pom.xml`
-
-If `walle-common` is published to your internal Maven repository (Nexus, Artifactory, GitHub Packages, etc.):
-
-```xml
-<dependency>
-    <groupId>com.walle</groupId>
-    <artifactId>walle-common</artifactId>
-    <version>1.0.0</version>
-</dependency>
+├── CHANGELOG.md
+├── README.md
+├── .gitlab-ci.yml
+├── GitVersion.yml
+└── target/
