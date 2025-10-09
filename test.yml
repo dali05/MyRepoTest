@@ -1,22 +1,70 @@
-walle-backend-common/
-├── src/
-│   └── main/
-│       ├── java/
-│       │   └── com/bnpp/pf/pfspringpoc/
-│       │       ├── common/
-│       │       │   ├── api/
-│       │       │   ├── exception/
-│       │       │   ├── logging/
-│       │       │   └── web/
-│       │       ├── conf/
-│       │       └── doc/
-│       └── resources/
-│           ├── META-INF/spring/
-│           │   └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
-│           └── logback-spring.xml
-├── pom.xml
-├── CHANGELOG.md
-├── README.md
-├── .gitlab-ci.yml
-├── GitVersion.yml
-└── target/
+package com.example.common.postgres;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@ConfigurationProperties(prefix = "common.postgres")
+public class PostgresCommonProperties {
+
+    /**
+     * Active ou désactive la configuration commune PostgreSQL.
+     */
+    private boolean enabled = true;
+
+    /**
+     * Nom du schéma par défaut (optionnel).
+     */
+    private String schema;
+
+    /**
+     * Afficher les requêtes SQL (optionnel).
+     */
+    private boolean showSql = false;
+
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+    public String getSchema() { return schema; }
+    public void setSchema(String schema) { this.schema = schema; }
+
+    public boolean isShowSql() { return showSql; }
+    public void setShowSql(boolean showSql) { this.showSql = showSql; }
+}
+
+
+
+
+package com.example.common.postgres;
+
+import jakarta.annotation.PostConstruct;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.core.env.Environment;
+
+/**
+ * Étend la configuration PostgreSQL native de Spring Boot sans la remplacer.
+ * Permet d'ajouter des réglages communs (schema, logs SQL, etc.).
+ */
+@AutoConfiguration
+@EnableConfigurationProperties(PostgresCommonProperties.class)
+@ConditionalOnProperty(prefix = "common.postgres", name = "enabled", havingValue = "true", matchIfMissing = true)
+public class PostgresCommonAutoConfiguration {
+
+    private final PostgresCommonProperties props;
+    private final Environment env;
+
+    public PostgresCommonAutoConfiguration(PostgresCommonProperties props, Environment env) {
+        this.props = props;
+        this.env = env;
+    }
+
+    @PostConstruct
+    public void applyCommonSettings() {
+        if (props.getSchema() != null) {
+            System.setProperty("spring.jpa.properties.hibernate.default_schema", props.getSchema());
+        }
+        if (props.isShowSql()) {
+            System.setProperty("spring.jpa.show-sql", "true");
+        }
+    }
+}
