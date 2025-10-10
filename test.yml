@@ -1,5 +1,53 @@
 package com.example.common.kafka;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.util.Map;
+
+@ConfigurationProperties(prefix = "common.kafka")
+public class KafkaAvroProperties {
+
+    private boolean enabled = true;
+
+    private BrokerProperties broker = new BrokerProperties();
+    private SchemaRegistryProperties schemaRegistry = new SchemaRegistryProperties();
+
+    private Map<String, String> producer;
+    private Map<String, String> consumer;
+
+    // Getters / Setters
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+    public BrokerProperties getBroker() { return broker; }
+    public void setBroker(BrokerProperties broker) { this.broker = broker; }
+
+    public SchemaRegistryProperties getSchemaRegistry() { return schemaRegistry; }
+    public void setSchemaRegistry(SchemaRegistryProperties schemaRegistry) { this.schemaRegistry = schemaRegistry; }
+
+    public Map<String, String> getProducer() { return producer; }
+    public void setProducer(Map<String, String> producer) { this.producer = producer; }
+
+    public Map<String, String> getConsumer() { return consumer; }
+    public void setConsumer(Map<String, String> consumer) { this.consumer = consumer; }
+
+    // Inner classes
+    public static class BrokerProperties {
+        private String bootstrapServers = "localhost:9092";
+        public String getBootstrapServers() { return bootstrapServers; }
+        public void setBootstrapServers(String bootstrapServers) { this.bootstrapServers = bootstrapServers; }
+    }
+
+    public static class SchemaRegistryProperties {
+        private String url = "http://localhost:8081";
+        public String getUrl() { return url; }
+        public void setUrl(String url) { this.url = url; }
+    }
+}
+
+
+package com.example.common.kafka;
+
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -30,10 +78,10 @@ public class KafkaAvroAutoConfiguration {
     @ConditionalOnMissingBean
     public ProducerFactory<String, Object> producerFactory(KafkaAvroProperties props) {
         Map<String, Object> config = new HashMap<>();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBootstrapServers());
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBroker().getBootstrapServers());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
-        config.put("schema.registry.url", props.getSchemaRegistryUrl());
+        config.put("schema.registry.url", props.getSchemaRegistry().getUrl());
         if (props.getProducer() != null) config.putAll(props.getProducer());
         return new DefaultKafkaProducerFactory<>(config);
     }
@@ -48,10 +96,10 @@ public class KafkaAvroAutoConfiguration {
     @ConditionalOnMissingBean
     public ConsumerFactory<String, Object> consumerFactory(KafkaAvroProperties props) {
         Map<String, Object> config = new HashMap<>();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBootstrapServers());
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBroker().getBootstrapServers());
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class);
-        config.put("schema.registry.url", props.getSchemaRegistryUrl());
+        config.put("schema.registry.url", props.getSchemaRegistry().getUrl());
         config.put("specific.avro.reader", "true");
         if (props.getConsumer() != null) config.putAll(props.getConsumer());
         return new DefaultKafkaConsumerFactory<>(config);
@@ -70,24 +118,15 @@ public class KafkaAvroAutoConfiguration {
 
 
 
-@Component
-public class DemoConsumer {
-    @KafkaListener(topics = "demo-topic", groupId = "demo-group")
-    public void consume(ConsumerRecord<String, Object> record) {
-        System.out.println("📥 " + record.value());
-    }
-}
-
-
-
-@Service
-public class DemoProducer {
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-    public DemoProducer(KafkaTemplate<String, Object> kafkaTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
-    }
-    public void send(String topic, Object message) {
-        kafkaTemplate.send(topic, message);
-    }
-}
-
+common:
+  kafka:
+    enabled: true
+    broker:
+      bootstrap-servers: localhost:9092
+    schema-registry:
+      url: http://localhost:8081
+    producer:
+      acks: all
+    consumer:
+      group-id: demo-group
+      auto-offset-reset: earliest
