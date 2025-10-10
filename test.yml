@@ -1,70 +1,93 @@
-package com.example.common.postgres;
+package com.example.common.kafka;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
-@ConfigurationProperties(prefix = "common.postgres")
-public class PostgresCommonProperties {
-
-    /**
-     * Active ou désactive la configuration commune PostgreSQL.
-     */
-    private boolean enabled = true;
-
-    /**
-     * Nom du schéma par défaut (optionnel).
-     */
-    private String schema;
-
-    /**
-     * Afficher les requêtes SQL (optionnel).
-     */
-    private boolean showSql = false;
-
-    public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-
-    public String getSchema() { return schema; }
-    public void setSchema(String schema) { this.schema = schema; }
-
-    public boolean isShowSql() { return showSql; }
-    public void setShowSql(boolean showSql) { this.showSql = showSql; }
-}
-
-
-
-
-package com.example.common.postgres;
-
-import jakarta.annotation.PostConstruct;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.core.env.Environment;
+import org.springframework.context.annotation.Bean;
+import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.*;
 
-/**
- * Étend la configuration PostgreSQL native de Spring Boot sans la remplacer.
- * Permet d'ajouter des réglages communs (schema, logs SQL, etc.).
- */
+import java.util.HashMap;
+import java.util.Map;
+
 @AutoConfiguration
-@EnableConfigurationProperties(PostgresCommonProperties.class)
-@ConditionalOnProperty(prefix = "common.postgres", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class PostgresCommonAutoConfiguration {
+@EnableKafka
+@EnableConfigurationProperties(KafkaAvroProperties.class)
+@ConditionalOnProperty(prefix = "common.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnClass({KafkaTemplate.class, KafkaAvroSerializer.class})
+public class KafkaAvroAutoConfiguration {
 
-    private final PostgresCommonProperties props;
-    private final Environment env;
-
-    public PostgresCommonAutoConfiguration(PostgresCommonProperties props, Environment env) {
-        this.props = props;
-        this.env = env;
+    @Bean
+    @ConditionalOnMissingBean
+    public ProducerFactory<String, Object> producerFactory(KafkaAvroProperties props) {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBootstrapServers());
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
+        config.put("schema.registry.url", props.getSchemaRegistryUrl());
+        if (props.getProducer() != null) config.putAll(props.getProducer());
+        return new DefaultKafkaProducerFactory<>(config);
     }
 
-    @PostConstruct
-    public void applyCommonSettings() {
-        if (props.getSchema() != null) {
-            System.setProperty("spring.jpa.properties.hibernate.default_schema", props.getSchema());
-        }
-        if (props.isShowSql()) {
-            System.setProperty("spring.jpa.show-sql", "true");
-        }
+    @Bean
+    @ConditionalOnMissingBean
+    public KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> pf) {
+        return new KafkaTemplate<>(pf);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ConsumerFactory<String, Object> consumerFactory(KafkaAvroProperties props) {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBootstrapServers());
+        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class);
+        config.put("schema.registry.url", props.getSchemaRegistryUrl());
+        config.put("specific.avro.reader", "true");
+        if (props.getConsumer() != null) config.putAll(props.getConsumer());
+        return new DefaultKafkaConsumerFactory<>(config);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
+            ConsumerFactory<String, Object> cf) {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(cf);
+        return factory;
     }
 }
+
+
+
+@Component
+public class DemoConsumer {
+    @KafkaListener(topics = "demo-topic", groupId = "demo-group")
+    public void consume(ConsumerRecord<String, Object> record) {
+        System.out.println("📥 " + record.value());
+    }
+}
+
+
+
+@Service
+public class DemoProducer {
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    public DemoProducer(KafkaTemplate<String, Object> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
+    }
+    public void send(String topic, Object message) {
+        kafkaTemplate.send(topic, message);
+    }
+}
+
