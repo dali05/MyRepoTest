@@ -1,132 +1,97 @@
-package com.example.common.kafka;
+package com.example.common.api.response;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.util.Map;
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "Structure standard pour toutes les réponses REST")
+public class ApiResponse<T> {
 
-@ConfigurationProperties(prefix = "common.kafka")
-public class KafkaAvroProperties {
+    @Schema(description = "Indique si la requête a réussi")
+    private boolean success;
 
-    private boolean enabled = true;
+    @Schema(description = "Message de statut ou d'erreur")
+    private String message;
 
-    private BrokerProperties broker = new BrokerProperties();
-    private SchemaRegistryProperties schemaRegistry = new SchemaRegistryProperties();
+    @Schema(description = "Données renvoyées (String, DTO, List, etc.)")
+    private T data;
 
-    private Map<String, String> producer;
-    private Map<String, String> consumer;
+    @Schema(description = "Code d'erreur métier optionnel")
+    private String errorCode;
 
-    // Getters / Setters
-    public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public ApiResponse() {}
 
-    public BrokerProperties getBroker() { return broker; }
-    public void setBroker(BrokerProperties broker) { this.broker = broker; }
-
-    public SchemaRegistryProperties getSchemaRegistry() { return schemaRegistry; }
-    public void setSchemaRegistry(SchemaRegistryProperties schemaRegistry) { this.schemaRegistry = schemaRegistry; }
-
-    public Map<String, String> getProducer() { return producer; }
-    public void setProducer(Map<String, String> producer) { this.producer = producer; }
-
-    public Map<String, String> getConsumer() { return consumer; }
-    public void setConsumer(Map<String, String> consumer) { this.consumer = consumer; }
-
-    // Inner classes
-    public static class BrokerProperties {
-        private String bootstrapServers = "localhost:9092";
-        public String getBootstrapServers() { return bootstrapServers; }
-        public void setBootstrapServers(String bootstrapServers) { this.bootstrapServers = bootstrapServers; }
+    private ApiResponse(boolean success, String message, T data, String errorCode) {
+        this.success = success;
+        this.message = message;
+        this.data = data;
+        this.errorCode = errorCode;
     }
 
-    public static class SchemaRegistryProperties {
-        private String url = "http://localhost:8081";
-        public String getUrl() { return url; }
-        public void setUrl(String url) { this.url = url; }
+    // --- Fabriques statiques (type-safe) ---
+    public static <T> ApiResponse<T> success(T data) {
+        return new ApiResponse<>(true, "success", data, null);
     }
+
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return new ApiResponse<>(true, message, data, null);
+    }
+
+    public static <T> ApiResponse<T> error(String message) {
+        return new ApiResponse<>(false, message, null, null);
+    }
+
+    public static <T> ApiResponse<T> error(String message, String code) {
+        return new ApiResponse<>(false, message, null, code);
+    }
+
+    // --- Getters / Setters ---
+    public boolean isSuccess() { return success; }
+    public void setSuccess(boolean success) { this.success = success; }
+
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+
+    public T getData() { return data; }
+    public void setData(T data) { this.data = data; }
+
+    public String getErrorCode() { return errorCode; }
+    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
 }
 
 
-package com.example.common.kafka;
+package com.example.common.api.advice;
 
-import io.confluent.kafka.serializers.KafkaAvroDeserializer;
-import io.confluent.kafka.serializers.KafkaAvroSerializer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.kafka.annotation.EnableKafka;
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.*;
+import com.example.common.api.response.ApiResponse;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
-import java.util.HashMap;
-import java.util.Map;
+@ControllerAdvice
+public class ApiResponseAdvice implements ResponseBodyAdvice<Object> {
 
-@AutoConfiguration
-@EnableKafka
-@EnableConfigurationProperties(KafkaAvroProperties.class)
-@ConditionalOnProperty(prefix = "common.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
-@ConditionalOnClass({KafkaTemplate.class, KafkaAvroSerializer.class})
-public class KafkaAvroAutoConfiguration {
-
-    @Bean
-    @ConditionalOnMissingBean
-    public ProducerFactory<String, Object> producerFactory(KafkaAvroProperties props) {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBroker().getBootstrapServers());
-        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
-        config.put("schema.registry.url", props.getSchemaRegistry().getUrl());
-        if (props.getProducer() != null) config.putAll(props.getProducer());
-        return new DefaultKafkaProducerFactory<>(config);
+    @Override
+    public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+        // Intercepter toutes les réponses sauf celles déjà ApiResponse
+        return !ApiResponse.class.isAssignableFrom(returnType.getParameterType());
     }
 
-    @Bean
-    @ConditionalOnMissingBean
-    public KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> pf) {
-        return new KafkaTemplate<>(pf);
-    }
+    @Override
+    public Object beforeBodyWrite(Object body, MethodParameter returnType,
+                                  MediaType selectedContentType,
+                                  Class<? extends HttpMessageConverter<?>> selectedConverterType,
+                                  ServerHttpRequest request,
+                                  ServerHttpResponse response) {
 
-    @Bean
-    @ConditionalOnMissingBean
-    public ConsumerFactory<String, Object> consumerFactory(KafkaAvroProperties props) {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, props.getBroker().getBootstrapServers());
-        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class);
-        config.put("schema.registry.url", props.getSchemaRegistry().getUrl());
-        config.put("specific.avro.reader", "true");
-        if (props.getConsumer() != null) config.putAll(props.getConsumer());
-        return new DefaultKafkaConsumerFactory<>(config);
-    }
+        if (body instanceof ApiResponse<?>) {
+            return body; // déjà standardisé
+        }
 
-    @Bean
-    @ConditionalOnMissingBean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> cf) {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(cf);
-        return factory;
+        // Auto-wrapper : enveloppe tout le reste dans un ApiResponse.success
+        return ApiResponse.success(body);
     }
 }
-
-
-
-common:
-  kafka:
-    enabled: true
-    broker:
-      bootstrap-servers: localhost:9092
-    schema-registry:
-      url: http://localhost:8081
-    producer:
-      acks: all
-    consumer:
-      group-id: demo-group
-      auto-offset-reset: earliest
