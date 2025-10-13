@@ -1,97 +1,73 @@
-package com.example.common.api.response;
+package com.lma.apiresponse.api.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import io.swagger.v3.oas.annotations.media.Schema;
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
-@Schema(description = "Structure standard pour toutes les réponses REST")
-public class ApiResponse<T> {
-
-    @Schema(description = "Indique si la requête a réussi")
-    private boolean success;
-
-    @Schema(description = "Message de statut ou d'erreur")
-    private String message;
-
-    @Schema(description = "Données renvoyées (String, DTO, List, etc.)")
-    private T data;
-
-    @Schema(description = "Code d'erreur métier optionnel")
-    private String errorCode;
-
-    public ApiResponse() {}
-
-    private ApiResponse(boolean success, String message, T data, String errorCode) {
-        this.success = success;
-        this.message = message;
-        this.data = data;
-        this.errorCode = errorCode;
-    }
-
-    // --- Fabriques statiques (type-safe) ---
-    public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, "success", data, null);
-    }
-
-    public static <T> ApiResponse<T> success(String message, T data) {
-        return new ApiResponse<>(true, message, data, null);
-    }
-
-    public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>(false, message, null, null);
-    }
-
-    public static <T> ApiResponse<T> error(String message, String code) {
-        return new ApiResponse<>(false, message, null, code);
-    }
-
-    // --- Getters / Setters ---
-    public boolean isSuccess() { return success; }
-    public void setSuccess(boolean success) { this.success = success; }
-
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
-
-    public T getData() { return data; }
-    public void setData(T data) { this.data = data; }
-
-    public String getErrorCode() { return errorCode; }
-    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
-}
-
-
-package com.example.common.api.advice;
-
-import com.example.common.api.response.ApiResponse;
+import com.lma.apiresponse.api.annotation.NoWrap;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.http.server.ServletServerHttpResponse;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
-@ControllerAdvice
-public class ApiResponseAdvice implements ResponseBodyAdvice<Object> {
+import java.util.Map;
 
+@RestControllerAdvice
+public class SuccessResponseBodyAdvice implements ResponseBodyAdvice<Object> {
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        // Intercepter toutes les réponses sauf celles déjà ApiResponse
-        return !ApiResponse.class.isAssignableFrom(returnType.getParameterType());
+        if (returnType.getContainingClass().isAnnotationPresent(NoWrap.class)) return false;
+        if (returnType.hasMethodAnnotation(NoWrap.class)) return false;
+        return true;
     }
 
     @Override
-    public Object beforeBodyWrite(Object body, MethodParameter returnType,
-                                  MediaType selectedContentType,
+    public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
                                   Class<? extends HttpMessageConverter<?>> selectedConverterType,
-                                  ServerHttpRequest request,
-                                  ServerHttpResponse response) {
+                                  ServerHttpRequest request, ServerHttpResponse response) {
 
-        if (body instanceof ApiResponse<?>) {
-            return body; // déjà standardisé
+
+        if (body instanceof ApiResponse) {
+            return body;
         }
 
-        // Auto-wrapper : enveloppe tout le reste dans un ApiResponse.success
-        return ApiResponse.success(body);
+        if (body instanceof ResponseEntity<?>) {
+            Object realBody = ((ResponseEntity<?>) body).getBody();
+            if (realBody instanceof ApiResponse) {
+                return body;
+            }
+            if (realBody == null) {
+                return ResponseEntity
+                        .status(((ResponseEntity<?>) body).getStatusCode())
+                        .body(ApiResponse.ok(null,  MetaBuilder.create().build()));
+            }
+            return ResponseEntity
+                    .status(((ResponseEntity<?>) body).getStatusCode())
+                    .body(ApiResponse.ok(realBody, MetaBuilder.create().build()));
+        }
+
+        if (body instanceof String) {
+            try {
+                return JsonUtils.toJson(ApiResponse.ok(body, MetaBuilder.create().build()));
+            } catch (Exception e) {
+                return body;
+            }
+        }
+
+        if (body == null) return null;
+
+
+        int status = 200;
+        if (response instanceof ServletServerHttpResponse servletResp) {
+            status = servletResp.getServletResponse().getStatus();
+        }
+
+        Map<String, Object> meta = MetaBuilder.create().build();
+        if (status == HttpStatus.CREATED.value()) {
+            return ApiResponse.created(body, meta);
+        }
+        return ApiResponse.ok(body, meta);
     }
 }
