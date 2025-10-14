@@ -6,52 +6,45 @@ import org.springframework.http.HttpStatus;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests unitaires pour BusinessRuleException.
+ * ✅ Tests unitaires pour {@link BusinessRuleException}
+ * Compatible avec un enum {@link BusinessErrorCode}.
  */
 class BusinessRuleExceptionTest {
 
-    enum DummyBusinessErrorCode implements BusinessErrorCode {
-        INVALID_AMOUNT("BUS-001", "Invalid amount"),
-        ACCOUNT_LOCKED("BUS-002", "Account is locked");
+    @Test
+    void testConstructor_usesDefaultMessageFromEnum() {
+        // Arrange & Act
+        BusinessRuleException ex = new BusinessRuleException(BusinessErrorCode.ACCOUNT_BLOCKED);
 
-        private final String code;
-        private final String defaultMessage;
-
-        DummyBusinessErrorCode(String code, String defaultMessage) {
-            this.code = code;
-            this.defaultMessage = defaultMessage;
-        }
-
-        @Override
-        public String code() {
-            return code;
-        }
-
-        @Override
-        public String defaultMessage() {
-            return defaultMessage;
-        }
+        // Assert
+        assertEquals(ErrorType.BUSINESS_ERROR, ex.getType());
+        assertEquals(422, ex.getStatus());
+        assertEquals("BIZ-002", ex.getCode());
+        assertEquals("The account is blocked", ex.getMessage());
+        assertEquals(BusinessErrorCode.ACCOUNT_BLOCKED, ex.getBusinessError());
     }
 
     @Test
-    void testConstructor_usesDefaultMessage() {
-        BusinessRuleException ex = new BusinessRuleException(DummyBusinessErrorCode.INVALID_AMOUNT);
+    void testConstructor_withCustomMessageOverridesDefault() {
+        // Arrange & Act
+        String customMessage = "User account manually locked by admin";
+        BusinessRuleException ex = new BusinessRuleException(BusinessErrorCode.ACCOUNT_BLOCKED, customMessage);
 
+        // Assert
         assertEquals(ErrorType.BUSINESS_ERROR, ex.getType());
         assertEquals(422, ex.getStatus());
-        assertEquals("BUS-001", ex.getCode());
-        assertEquals("Invalid amount", ex.getMessage());
-        assertEquals(DummyBusinessErrorCode.INVALID_AMOUNT, ex.getBusinessError());
+        assertEquals("BIZ-002", ex.getCode());
+        assertEquals(customMessage, ex.getMessage());
+        assertEquals(BusinessErrorCode.ACCOUNT_BLOCKED, ex.getBusinessError());
     }
 
     @Test
-    void testConstructor_usesCustomMessage() {
-        BusinessRuleException ex = new BusinessRuleException(DummyBusinessErrorCode.ACCOUNT_LOCKED, "This account cannot be used");
-
-        assertEquals(ErrorType.BUSINESS_ERROR, ex.getType());
-        assertEquals(422, ex.getStatus());
-        assertEquals("BUS-002", ex.getCode());
-        assertEquals("This account cannot be used", ex.getMessage());
-        assertEquals(DummyBusinessErrorCode.ACCOUNT_LOCKED, ex.getBusinessError());
+    void testAllEnumValuesHaveValidCodeAndMessage() {
+        for (BusinessErrorCode code : BusinessErrorCode.values()) {
+            assertNotNull(code.code(), "code() ne doit pas être null pour " + code.name());
+            assertTrue(code.code().startsWith("BIZ-"), "code() doit commencer par 'BIZ-' pour " + code.name());
+            assertNotNull(code.defaultMessage(), "defaultMessage() ne doit pas être null pour " + code.name());
+            assertFalse(code.defaultMessage().isBlank(), "defaultMessage() ne doit pas être vide pour " + code.name());
+        }
     }
 }
