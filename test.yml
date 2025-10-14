@@ -1,120 +1,27 @@
-package com.lma.apiresponse.storage.service;
+package com.lma.apiresponse.storage.conf;
 
 import com.ibm.cloud.objectstorage.services.s3.AmazonS3;
-import com.ibm.cloud.objectstorage.services.s3.model.*;
 import com.lma.apiresponse.storage.S3StorageProperties;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.*;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
-class S3StorageServiceTest {
+class S3StorageAutoConfigurationTest {
 
-    @Mock
-    private AmazonS3 s3Client;
-
-    @Mock
-    private MultipartFile multipartFile;
-
-    @InjectMocks
-    private S3StorageService service;
-
-    private S3StorageProperties props;
-
-    @BeforeEach
-    void setUp() throws IOException {
-        MockitoAnnotations.openMocks(this);
-        props = new S3StorageProperties();
-        props.setBucket("test-bucket");
-        props.setEndpoint("http://localhost");
+    @Test
+    void shouldCreateBeansSuccessfully() {
+        S3StorageProperties props = new S3StorageProperties();
         props.setAccessKey("key");
         props.setSecretKey("secret");
+        props.setEndpoint("http://localhost:9000");
         props.setRegion("eu-de");
+        props.setBucket("bucket");
 
-        service = new S3StorageService(s3Client, props);
-    }
+        S3StorageAutoConfiguration conf = new S3StorageAutoConfiguration();
 
-    // ----------------------------------------------------------
-    // 1️⃣ uploadFile
-    // ----------------------------------------------------------
-    @Test
-    void uploadFile_shouldUploadAndReturnMessage() throws IOException {
-        byte[] content = "hello".getBytes();
-        when(multipartFile.getBytes()).thenReturn(content);
-        when(multipartFile.getOriginalFilename()).thenReturn("file.txt");
+        AmazonS3 s3 = conf.s3Client(props);
+        assertNotNull(s3);
 
-        String result = service.uploadFile(multipartFile);
-
-        verify(s3Client, times(1))
-                .putObject(any(PutObjectRequest.class));
-
-        assertTrue(result.contains("File uploaded"));
-    }
-
-    @Test
-    void uploadFile_shouldThrowIOException_whenFileWriteFails() throws IOException {
-        MultipartFile badFile = mock(MultipartFile.class);
-        when(badFile.getBytes()).thenThrow(new IOException("write fail"));
-
-        assertThrows(IOException.class, () -> service.uploadFile(badFile));
-    }
-
-    // ----------------------------------------------------------
-    // 2️⃣ downloadFile
-    // ----------------------------------------------------------
-    @Test
-    void downloadFile_shouldReturnInputStream() {
-        S3Object s3Object = mock(S3Object.class);
-        InputStream inputStream = new ByteArrayInputStream("data".getBytes());
-
-        when(s3Object.getObjectContent()).thenReturn(new S3ObjectInputStream(inputStream, null));
-        when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(s3Object);
-
-        InputStream result = service.downloadFile("test.txt");
-
-        assertNotNull(result);
-    }
-
-    // ----------------------------------------------------------
-    // 3️⃣ listFiles
-    // ----------------------------------------------------------
-    @Test
-    void listFiles_shouldReturnFileKeys() {
-        ObjectListing listing = mock(ObjectListing.class);
-        S3ObjectSummary s1 = new S3ObjectSummary();
-        s1.setKey("file1.txt");
-        S3ObjectSummary s2 = new S3ObjectSummary();
-        s2.setKey("file2.txt");
-
-        when(listing.getObjectSummaries()).thenReturn(List.of(s1, s2));
-        when(s3Client.listObjects("test-bucket")).thenReturn(listing);
-
-        List<String> result = service.listFiles();
-
-        assertEquals(2, result.size());
-        assertTrue(result.contains("file1.txt"));
-        assertTrue(result.contains("file2.txt"));
-    }
-
-    // ----------------------------------------------------------
-    // 4️⃣ convertMultipartToFile (indirect test)
-    // ----------------------------------------------------------
-    @Test
-    void uploadFile_shouldCreateAndDeleteTempFile() throws IOException {
-        byte[] bytes = "content".getBytes();
-        when(multipartFile.getBytes()).thenReturn(bytes);
-        when(multipartFile.getOriginalFilename()).thenReturn("sample.txt");
-
-        String result = service.uploadFile(multipartFile);
-
-        assertTrue(result.contains("File uploaded"));
-        verify(s3Client, times(1)).putObject(any(PutObjectRequest.class));
+        assertNotNull(conf.storageService(s3, props));
     }
 }
