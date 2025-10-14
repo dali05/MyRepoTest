@@ -1,23 +1,22 @@
 package com.lma.apiresponse.api.config.doc;
 
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.method.HandlerMethod;
 import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
+@ExtendWith(MockitoExtension.class)
 class OpenApiConfigTest {
 
     private SpringdocProperties props;
@@ -25,9 +24,9 @@ class OpenApiConfigTest {
 
     @BeforeEach
     void setUp() {
-        props = Mockito.mock(SpringdocProperties.class);
-        Mockito.when(props.getTitle()).thenReturn("My API");
-        Mockito.when(props.getVersion()).thenReturn("1.0.0");
+        props = mock(SpringdocProperties.class);
+        when(props.getTitle()).thenReturn("My API");
+        when(props.getVersion()).thenReturn("1.0.0");
 
         config = new OpenApiConfig(props);
     }
@@ -60,7 +59,7 @@ class OpenApiConfigTest {
         OperationCustomizer customizer = config.dynamicTags();
         assertNotNull(customizer);
 
-        // Mock HandlerMethod for a fake controller
+        // Fake controller for test
         class UserController {
             public void getUser() {}
         }
@@ -93,3 +92,12 @@ class OpenApiConfigTest {
         assertNotNull(customizer);
     }
 }
+
+
+
+
+ <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-junit-jupiter</artifactId>
+        <scope>test</scope>
+    </dependency>
