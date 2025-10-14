@@ -1,15 +1,21 @@
 package com.lma.apiresponse.api.config.doc;
 
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
+import io.swagger.v3.oas.models.media.Schema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.method.HandlerMethod;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Method;
 
@@ -17,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class OpenApiConfigTest {
 
     private SpringdocProperties props;
@@ -33,15 +40,15 @@ class OpenApiConfigTest {
 
     @Test
     void testBaseOpenApiConfiguration() {
-        OpenAPI openAPI = config.baseOpenAPI();
+        var openAPI = config.baseOpenAPI();
 
         assertNotNull(openAPI);
         assertEquals("My API", openAPI.getInfo().getTitle());
         assertEquals("1.0.0", openAPI.getInfo().getVersion());
         assertTrue(openAPI.getComponents().getSecuritySchemes().containsKey("bearerAuth"));
 
-        SecurityScheme scheme = openAPI.getComponents().getSecuritySchemes().get("bearerAuth");
-        assertEquals(SecurityScheme.Type.HTTP, scheme.getType());
+        var scheme = openAPI.getComponents().getSecuritySchemes().get("bearerAuth");
+        assertEquals(io.swagger.v3.oas.models.security.SecurityScheme.Type.HTTP, scheme.getType());
         assertEquals("bearer", scheme.getScheme());
         assertEquals("JWT", scheme.getBearerFormat());
     }
@@ -59,11 +66,7 @@ class OpenApiConfigTest {
         OperationCustomizer customizer = config.dynamicTags();
         assertNotNull(customizer);
 
-        // Fake controller for test
-        class UserController {
-            public void getUser() {}
-        }
-
+        class UserController { public void getUser() {} }
         Method method = UserController.class.getMethod("getUser");
         HandlerMethod handlerMethod = new HandlerMethod(new UserController(), method);
 
@@ -87,17 +90,70 @@ class OpenApiConfigTest {
     }
 
     @Test
-    void testGlobalHeadersAndErrorsCustomizerNotNull() {
+    void testGlobalHeadersAndErrors_addsHeadersAndErrorResponses_withExpectedContent() {
+        // Arrange: un OpenAPI minimal avec 1 path et 1 opération
+        OpenAPI openAPI = new OpenAPI();
+        Operation op = new Operation();
+        PathItem pathItem = new PathItem().get(op);
+        openAPI.path("/api/test", pathItem);
+
         GlobalOpenApiCustomizer customizer = config.globalHeadersAndErrors();
-        assertNotNull(customizer);
+
+        // Act
+        customizer.customise(openAPI);
+
+        // Assert: les headers globaux sont ajoutés
+        assertNotNull(op.getParameters());
+        assertTrue(
+            op.getParameters().stream().anyMatch(p -> "X-Correlation-Id".equals(p.getName())),
+            "Header X-Correlation-Id manquant"
+        );
+        assertTrue(
+            op.getParameters().stream().anyMatch(p -> "Accept-Language".equals(p.getName())),
+            "Header Accept-Language manquant"
+        );
+
+        // Assert: les réponses d'erreur sont présentes
+        assertTrue(op.getResponses().containsKey("400"));
+        assertTrue(op.getResponses().containsKey("401"));
+        assertTrue(op.getResponses().containsKey("403"));
+        assertTrue(op.getResponses().containsKey("500"));
+
+        // On vérifie le contenu commun (commonErrorContent) à travers une des réponses (ex: 400)
+        var r400 = op.getResponses().get("400");
+        assertNotNull(r400.getContent());
+
+        Content content = r400.getContent();
+        assertTrue(content.containsKey("application/json"));
+        assertTrue(content.containsKey("application/problem+json"));
+
+        MediaType mt = content.get("application/json");
+        assertNotNull(mt.getSchema(), "Schema manquant dans application/json");
+
+        Schema<?> schema = mt.getSchema();
+        assertNotNull(schema.getProperties(), "Propriétés du schema manquantes");
+
+        // Les 3 propriétés attendues
+        assertTrue(schema.getProperties().containsKey("code"));
+        assertTrue(schema.getProperties().containsKey("message"));
+        assertTrue(schema.getProperties().containsKey("correlationId"));
+
+        // Les exemples attendus
+        Object codeEx = ((Schema<?>) schema.getProperties().get("code")).getExample();
+        Object msgEx = ((Schema<?>) schema.getProperties().get("message")).getExample();
+        Object corrEx = ((Schema<?>) schema.getProperties().get("correlationId")).getExample();
+
+        assertEquals("USER_NOT_FOUND", codeEx);
+        assertEquals("User not found", msgEx);
+        assertEquals("trace-id-123", corrEx);
+    }
+
+    @Test
+    void testGlobalHeadersAndErrors_doesNothingWhenNoPaths() {
+        OpenAPI openAPI = new OpenAPI(); // pas de paths
+        GlobalOpenApiCustomizer customizer = config.globalHeadersAndErrors();
+
+        // ne doit pas lever d'erreur
+        assertDoesNotThrow(() -> customizer.customise(openAPI));
     }
 }
-
-
-
-
- <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-junit-jupiter</artifactId>
-        <scope>test</scope>
-    </dependency>
