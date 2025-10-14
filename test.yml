@@ -1,41 +1,169 @@
-package com.lma.apiresponse.api.exception;
+package com.lma.apiresponse.api.response;
 
+import com.lma.apiresponse.api.annotation.NoWrap;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.server.ServletServerHttpResponse;
+
+import java.lang.reflect.Method;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-/**
- * ✅ Tests unitaires pour {@link NotFoundException}
- */
-class NotFoundExceptionTest {
+class SuccessResponseBodyAdviceTest {
 
+    private SuccessResponseBodyAdvice advice;
+
+    @BeforeEach
+    void setUp() {
+        advice = new SuccessResponseBodyAdvice();
+    }
+
+    // ---------------------------------------------------
+    // 1️⃣ supports()
+    // ---------------------------------------------------
     @Test
-    void testConstructor_shouldBuildProperMessage() {
-        // Arrange
-        String resource = "User";
-        int id = 123;
+    void testSupports_shouldReturnFalse_whenClassAnnotatedWithNoWrap() throws Exception {
+        Method method = NoWrapController.class.getMethod("getData");
+        MethodParameter mp = new MethodParameter(method, -1);
 
-        // Act
-        NotFoundException ex = new NotFoundException(resource, id);
-
-        // Assert
-        assertEquals(ErrorType.RESOURCE_NOT_FOUND, ex.getType());
-        assertEquals(404, ex.getStatus());
-        assertEquals("RES-404", ex.getCode());
-        assertEquals("User with id=123 not found", ex.getMessage());
+        assertFalse(advice.supports(mp, null));
     }
 
     @Test
-    void testConstructor_shouldHandleNullId() {
-        // Arrange
-        String resource = "Order";
+    void testSupports_shouldReturnFalse_whenMethodAnnotatedWithNoWrap() throws Exception {
+        Method method = NormalController.class.getMethod("noWrapMethod");
+        MethodParameter mp = new MethodParameter(method, -1);
 
-        // Act
-        NotFoundException ex = new NotFoundException(resource, null);
+        assertFalse(advice.supports(mp, null));
+    }
 
-        // Assert
-        assertEquals("Order with id=null not found", ex.getMessage());
-        assertEquals(404, ex.getStatus());
-        assertEquals(ErrorType.RESOURCE_NOT_FOUND, ex.getType());
+    @Test
+    void testSupports_shouldReturnTrue_whenNoAnnotations() throws Exception {
+        Method method = NormalController.class.getMethod("normalMethod");
+        MethodParameter mp = new MethodParameter(method, -1);
+
+        assertTrue(advice.supports(mp, null));
+    }
+
+    // ---------------------------------------------------
+    // 2️⃣ beforeBodyWrite() - ApiResponse déjà présent
+    // ---------------------------------------------------
+    @Test
+    void testBeforeBodyWrite_shouldReturnApiResponseAsIs() {
+        ApiResponse<Object> body = ApiResponse.ok("data", Map.of("meta", "ok"));
+        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, null, null);
+        assertSame(body, result);
+    }
+
+    // ---------------------------------------------------
+    // 3️⃣ beforeBodyWrite() - ResponseEntity avec ApiResponse
+    // ---------------------------------------------------
+    @Test
+    void testBeforeBodyWrite_shouldReturnResponseEntityWithApiResponseInside() {
+        ApiResponse<Object> apiResponse = ApiResponse.ok("ok", Map.of("meta", "meta"));
+        ResponseEntity<Object> responseEntity = ResponseEntity.ok(apiResponse);
+
+        Object result = advice.beforeBodyWrite(responseEntity, null, MediaType.APPLICATION_JSON, null, null, null);
+
+        assertSame(responseEntity, result);
+    }
+
+    // ---------------------------------------------------
+    // 4️⃣ beforeBodyWrite() - ResponseEntity avec corps simple
+    // ---------------------------------------------------
+    @Test
+    void testBeforeBodyWrite_shouldWrapResponseEntityBody() {
+        ResponseEntity<Object> input = ResponseEntity.status(HttpStatus.CREATED).body("DATA");
+
+        Object result = advice.beforeBodyWrite(input, null, MediaType.APPLICATION_JSON, null, null, null);
+        assertInstanceOf(ResponseEntity.class, result);
+
+        ResponseEntity<?> entity = (ResponseEntity<?>) result;
+        assertEquals(HttpStatus.CREATED, entity.getStatusCode());
+        assertInstanceOf(ApiResponse.class, entity.getBody());
+    }
+
+    // ---------------------------------------------------
+    // 5️⃣ beforeBodyWrite() - String body
+    // ---------------------------------------------------
+    @Test
+    void testBeforeBodyWrite_shouldWrapStringAsJson() {
+        Object result = advice.beforeBodyWrite("hello", null, MediaType.APPLICATION_JSON, null, null, null);
+
+        assertTrue(result instanceof String);
+        assertTrue(((String) result).contains("\"data\":\"hello\""));
+    }
+
+    // ---------------------------------------------------
+    // 6️⃣ beforeBodyWrite() - Null body
+    // ---------------------------------------------------
+    @Test
+    void testBeforeBodyWrite_shouldReturnNull_whenBodyIsNull() {
+        Object result = advice.beforeBodyWrite(null, null, MediaType.APPLICATION_JSON, null, null, null);
+        assertNull(result);
+    }
+
+    // ---------------------------------------------------
+    // 7️⃣ beforeBodyWrite() - Created (HTTP 201)
+    // ---------------------------------------------------
+    @Test
+    void testBeforeBodyWrite_shouldReturnCreatedApiResponse_whenStatusIsCreated() {
+        ServletServerHttpResponse servletResponse = mock(ServletServerHttpResponse.class);
+        when(servletResponse.getServletResponse()).thenReturn(new MockHttpServletResponse(201));
+
+        Object result = advice.beforeBodyWrite("body", null, MediaType.APPLICATION_JSON, null, null, servletResponse);
+
+        assertInstanceOf(ApiResponse.class, result);
+        ApiResponse<?> apiResponse = (ApiResponse<?>) result;
+        assertEquals("body", apiResponse.data());
+    }
+
+    // ---------------------------------------------------
+    // 8️⃣ beforeBodyWrite() - Default OK (HTTP 200)
+    // ---------------------------------------------------
+    @Test
+    void testBeforeBodyWrite_shouldReturnOkApiResponse_whenStatusIs200() {
+        ServletServerHttpResponse servletResponse = mock(ServletServerHttpResponse.class);
+        when(servletResponse.getServletResponse()).thenReturn(new MockHttpServletResponse(200));
+
+        Object result = advice.beforeBodyWrite("body", null, MediaType.APPLICATION_JSON, null, null, servletResponse);
+
+        assertInstanceOf(ApiResponse.class, result);
+        ApiResponse<?> apiResponse = (ApiResponse<?>) result;
+        assertEquals("body", apiResponse.data());
+    }
+
+    // --- Contrôleurs fictifs pour supports() ---
+    @NoWrap
+    static class NoWrapController {
+        public String getData() { return "ok"; }
+    }
+
+    static class NormalController {
+        @NoWrap
+        public String noWrapMethod() { return "ignored"; }
+
+        public String normalMethod() { return "wrapped"; }
+    }
+
+    // --- Faux HttpServletResponse pour tester le code HTTP ---
+    static class MockHttpServletResponse extends jakarta.servlet.http.HttpServletResponseWrapper {
+        private final int status;
+
+        public MockHttpServletResponse(int status) {
+            super(Mockito.mock(jakarta.servlet.http.HttpServletResponse.class));
+            this.status = status;
+        }
+
+        @Override
+        public int getStatus() {
+            return status;
+        }
     }
 }
