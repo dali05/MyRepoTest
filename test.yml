@@ -1,50 +1,41 @@
 package com.lma.apiresponse.api.exception;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * ✅ Tests unitaires pour {@link BusinessRuleException}
- * Compatible avec un enum {@link BusinessErrorCode}.
+ * ✅ Tests unitaires pour {@link NotFoundException}
  */
-class BusinessRuleExceptionTest {
+class NotFoundExceptionTest {
 
     @Test
-    void testConstructor_usesDefaultMessageFromEnum() {
-        // Arrange & Act
-        BusinessRuleException ex = new BusinessRuleException(BusinessErrorCode.ACCOUNT_BLOCKED);
+    void testConstructor_shouldBuildProperMessage() {
+        // Arrange
+        String resource = "User";
+        int id = 123;
+
+        // Act
+        NotFoundException ex = new NotFoundException(resource, id);
 
         // Assert
-        assertEquals(ErrorType.BUSINESS_ERROR, ex.getType());
-        assertEquals(422, ex.getStatus());
-        assertEquals("BIZ-002", ex.getCode());
-        assertEquals("The account is blocked", ex.getMessage());
-        assertEquals(BusinessErrorCode.ACCOUNT_BLOCKED, ex.getBusinessError());
+        assertEquals(ErrorType.RESOURCE_NOT_FOUND, ex.getType());
+        assertEquals(404, ex.getStatus());
+        assertEquals("RES-404", ex.getCode());
+        assertEquals("User with id=123 not found", ex.getMessage());
     }
 
     @Test
-    void testConstructor_withCustomMessageOverridesDefault() {
-        // Arrange & Act
-        String customMessage = "User account manually locked by admin";
-        BusinessRuleException ex = new BusinessRuleException(BusinessErrorCode.ACCOUNT_BLOCKED, customMessage);
+    void testConstructor_shouldHandleNullId() {
+        // Arrange
+        String resource = "Order";
+
+        // Act
+        NotFoundException ex = new NotFoundException(resource, null);
 
         // Assert
-        assertEquals(ErrorType.BUSINESS_ERROR, ex.getType());
-        assertEquals(422, ex.getStatus());
-        assertEquals("BIZ-002", ex.getCode());
-        assertEquals(customMessage, ex.getMessage());
-        assertEquals(BusinessErrorCode.ACCOUNT_BLOCKED, ex.getBusinessError());
-    }
-
-    @Test
-    void testAllEnumValuesHaveValidCodeAndMessage() {
-        for (BusinessErrorCode code : BusinessErrorCode.values()) {
-            assertNotNull(code.code(), "code() ne doit pas être null pour " + code.name());
-            assertTrue(code.code().startsWith("BIZ-"), "code() doit commencer par 'BIZ-' pour " + code.name());
-            assertNotNull(code.defaultMessage(), "defaultMessage() ne doit pas être null pour " + code.name());
-            assertFalse(code.defaultMessage().isBlank(), "defaultMessage() ne doit pas être vide pour " + code.name());
-        }
+        assertEquals("Order with id=null not found", ex.getMessage());
+        assertEquals(404, ex.getStatus());
+        assertEquals(ErrorType.RESOURCE_NOT_FOUND, ex.getType());
     }
 }
