@@ -1,73 +1,95 @@
-package com.lma.apiresponse.api.response;
+package com.lma.apiresponse.api.config.doc;
 
-import com.lma.apiresponse.api.annotation.NoWrap;
-import org.springframework.core.MethodParameter;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.http.server.ServletServerHttpResponse;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
+import org.springdoc.core.customizers.OperationCustomizer;
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.web.method.HandlerMethod;
 
-import java.util.Map;
+import java.lang.reflect.Method;
 
-@RestControllerAdvice
-public class SuccessResponseBodyAdvice implements ResponseBodyAdvice<Object> {
-    @Override
-    public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        if (returnType.getContainingClass().isAnnotationPresent(NoWrap.class)) return false;
-        if (returnType.hasMethodAnnotation(NoWrap.class)) return false;
-        return true;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+
+@SpringBootTest
+class OpenApiConfigTest {
+
+    private SpringdocProperties props;
+    private OpenApiConfig config;
+
+    @BeforeEach
+    void setUp() {
+        props = Mockito.mock(SpringdocProperties.class);
+        Mockito.when(props.getTitle()).thenReturn("My API");
+        Mockito.when(props.getVersion()).thenReturn("1.0.0");
+
+        config = new OpenApiConfig(props);
     }
 
-    @Override
-    public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
-                                  Class<? extends HttpMessageConverter<?>> selectedConverterType,
-                                  ServerHttpRequest request, ServerHttpResponse response) {
+    @Test
+    void testBaseOpenApiConfiguration() {
+        OpenAPI openAPI = config.baseOpenAPI();
 
+        assertNotNull(openAPI);
+        assertEquals("My API", openAPI.getInfo().getTitle());
+        assertEquals("1.0.0", openAPI.getInfo().getVersion());
+        assertTrue(openAPI.getComponents().getSecuritySchemes().containsKey("bearerAuth"));
 
-        if (body instanceof ApiResponse) {
-            return body;
+        SecurityScheme scheme = openAPI.getComponents().getSecuritySchemes().get("bearerAuth");
+        assertEquals(SecurityScheme.Type.HTTP, scheme.getType());
+        assertEquals("bearer", scheme.getScheme());
+        assertEquals("JWT", scheme.getBearerFormat());
+    }
+
+    @Test
+    void testGroupedOpenApiCreation() {
+        GroupedOpenApi groupedOpenApi = config.groupedOpenApi();
+
+        assertNotNull(groupedOpenApi);
+        assertEquals("public", groupedOpenApi.getGroup());
+    }
+
+    @Test
+    void testDynamicTagsAddsDefaultTag() throws NoSuchMethodException {
+        OperationCustomizer customizer = config.dynamicTags();
+        assertNotNull(customizer);
+
+        // Mock HandlerMethod for a fake controller
+        class UserController {
+            public void getUser() {}
         }
 
-        if (body instanceof ResponseEntity<?>) {
-            Object realBody = ((ResponseEntity<?>) body).getBody();
-            if (realBody instanceof ApiResponse) {
-                return body;
-            }
-            if (realBody == null) {
-                return ResponseEntity
-                        .status(((ResponseEntity<?>) body).getStatusCode())
-                        .body(ApiResponse.ok(null,  MetaBuilder.create().build()));
-            }
-            return ResponseEntity
-                    .status(((ResponseEntity<?>) body).getStatusCode())
-                    .body(ApiResponse.ok(realBody, MetaBuilder.create().build()));
-        }
+        Method method = UserController.class.getMethod("getUser");
+        HandlerMethod handlerMethod = new HandlerMethod(new UserController(), method);
 
-        if (body instanceof String) {
-            try {
-                return JsonUtils.toJson(ApiResponse.ok(body, MetaBuilder.create().build()));
-            } catch (Exception e) {
-                return body;
-            }
-        }
+        var operation = new io.swagger.v3.oas.models.Operation();
+        operation = customizer.customize(operation, handlerMethod);
 
-        if (body == null) return null;
+        assertNotNull(operation.getTags());
+        assertEquals(1, operation.getTags().size());
+        assertEquals("User", operation.getTags().get(0));
+    }
 
+    @Test
+    void testApiBeanBuildsCorrectly() {
+        GlobalOpenApiCustomizer globalCustomizer = mock(GlobalOpenApiCustomizer.class);
+        OperationCustomizer dynamicTags = mock(OperationCustomizer.class);
 
-        int status = 200;
-        if (response instanceof ServletServerHttpResponse servletResp) {
-            status = servletResp.getServletResponse().getStatus();
-        }
+        GroupedOpenApi api = config.api(globalCustomizer, dynamicTags);
 
-        Map<String, Object> meta = MetaBuilder.create().build();
-        if (status == HttpStatus.CREATED.value()) {
-            return ApiResponse.created(body, meta);
-        }
-        return ApiResponse.ok(body, meta);
+        assertNotNull(api);
+        assertEquals("public", api.getGroup());
+    }
+
+    @Test
+    void testGlobalHeadersAndErrorsCustomizerNotNull() {
+        GlobalOpenApiCustomizer customizer = config.globalHeadersAndErrors();
+        assertNotNull(customizer);
     }
 }
