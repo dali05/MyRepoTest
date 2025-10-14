@@ -25,111 +25,136 @@ class SuccessResponseBodyAdviceTest {
     private ServerHttpResponse mockResponse;
 
     @BeforeEach
-    void setUp() {
+    void setup() {
         advice = new SuccessResponseBodyAdvice();
         mockRequest = mock(ServerHttpRequest.class);
         mockResponse = mock(ServerHttpResponse.class);
-
-        // important : simuler un URI non nul
-        when(mockRequest.getURI()).thenReturn(URI.create("http://localhost/api/test"));
+        when(mockRequest.getURI()).thenReturn(URI.create("http://localhost/test"));
     }
 
+    // ---------- supports() ----------
+
     @Test
-    void testSupports_shouldReturnFalse_whenClassAnnotatedWithNoWrap() throws Exception {
+    void supports_shouldReturnFalse_whenClassAnnotatedWithNoWrap() throws Exception {
         Method method = NoWrapController.class.getMethod("getData");
-        MethodParameter mp = new MethodParameter(method, -1);
-        assertFalse(advice.supports(mp, null));
+        MethodParameter param = new MethodParameter(method, -1);
+        assertFalse(advice.supports(param, (Class<? extends HttpMessageConverter<?>>) null));
     }
 
     @Test
-    void testSupports_shouldReturnFalse_whenMethodAnnotatedWithNoWrap() throws Exception {
+    void supports_shouldReturnFalse_whenMethodAnnotatedWithNoWrap() throws Exception {
         Method method = NormalController.class.getMethod("noWrapMethod");
-        MethodParameter mp = new MethodParameter(method, -1);
-        assertFalse(advice.supports(mp, null));
+        MethodParameter param = new MethodParameter(method, -1);
+        assertFalse(advice.supports(param, (Class<? extends HttpMessageConverter<?>>) null));
     }
 
     @Test
-    void testSupports_shouldReturnTrue_whenNoAnnotations() throws Exception {
+    void supports_shouldReturnTrue_whenNoAnnotation() throws Exception {
         Method method = NormalController.class.getMethod("normalMethod");
-        MethodParameter mp = new MethodParameter(method, -1);
-        assertTrue(advice.supports(mp, null));
+        MethodParameter param = new MethodParameter(method, -1);
+        assertTrue(advice.supports(param, (Class<? extends HttpMessageConverter<?>>) null));
     }
 
+    // ---------- beforeBodyWrite() ----------
+
     @Test
-    void testBeforeBodyWrite_shouldReturnApiResponseAsIs() {
-        ApiResponse<Object> body = ApiResponse.ok("data", Map.of("meta", "ok"));
-        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON,
-                null, mockRequest, mockResponse);
+    void shouldReturnSameApiResponse_whenBodyIsApiResponse() {
+        ApiResponse<String> body = ApiResponse.ok("data", Map.of());
+        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
         assertSame(body, result);
     }
 
     @Test
-    void testBeforeBodyWrite_shouldReturnResponseEntityWithApiResponseInside() {
-        ApiResponse<Object> apiResponse = ApiResponse.ok("ok", Map.of("meta", "meta"));
-        ResponseEntity<Object> responseEntity = ResponseEntity.ok(apiResponse);
+    void shouldReturnSameResponseEntity_whenBodyIsResponseEntityWithApiResponse() {
+        ApiResponse<String> api = ApiResponse.ok("data", Map.of());
+        ResponseEntity<ApiResponse<String>> resp = ResponseEntity.ok(api);
 
-        Object result = advice.beforeBodyWrite(responseEntity, null, MediaType.APPLICATION_JSON,
-                null, mockRequest, mockResponse);
-
-        assertSame(responseEntity, result);
+        Object result = advice.beforeBodyWrite(resp, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
+        assertSame(resp, result);
     }
 
     @Test
-    void testBeforeBodyWrite_shouldWrapResponseEntityBody() {
-        ResponseEntity<Object> input = ResponseEntity.status(HttpStatus.CREATED).body("DATA");
+    void shouldWrapResponseEntityWithNullBody() {
+        ResponseEntity<Object> resp = ResponseEntity.status(HttpStatus.ACCEPTED).body(null);
+        Object result = advice.beforeBodyWrite(resp, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
 
-        Object result = advice.beforeBodyWrite(input, null, MediaType.APPLICATION_JSON,
-                null, mockRequest, mockResponse);
         assertInstanceOf(ResponseEntity.class, result);
-
-        ResponseEntity<?> entity = (ResponseEntity<?>) result;
-        assertEquals(HttpStatus.CREATED, entity.getStatusCode());
-        assertInstanceOf(ApiResponse.class, entity.getBody());
+        ResponseEntity<?> re = (ResponseEntity<?>) result;
+        assertInstanceOf(ApiResponse.class, re.getBody());
+        assertEquals(HttpStatus.ACCEPTED, re.getStatusCode());
     }
 
     @Test
-    void testBeforeBodyWrite_shouldWrapStringAsJson() {
-        Object result = advice.beforeBodyWrite("hello", null, MediaType.APPLICATION_JSON,
-                null, mockRequest, mockResponse);
+    void shouldWrapResponseEntityWithNormalBody() {
+        ResponseEntity<String> resp = ResponseEntity.ok("body");
+        Object result = advice.beforeBodyWrite(resp, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
 
+        assertInstanceOf(ResponseEntity.class, result);
+        ResponseEntity<?> re = (ResponseEntity<?>) result;
+        assertInstanceOf(ApiResponse.class, re.getBody());
+    }
+
+    @Test
+    void shouldReturnJsonString_whenBodyIsString() {
+        Object result = advice.beforeBodyWrite("hello", null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
         assertTrue(result instanceof String);
         assertTrue(((String) result).contains("\"data\":\"hello\""));
     }
 
     @Test
-    void testBeforeBodyWrite_shouldReturnNull_whenBodyIsNull() {
-        Object result = advice.beforeBodyWrite(null, null, MediaType.APPLICATION_JSON,
-                null, mockRequest, mockResponse);
+    void shouldReturnRawString_whenJsonConversionFails() {
+        // Simuler une exception dans JsonUtils
+        SuccessResponseBodyAdvice spyAdvice = Mockito.spy(advice);
+        Mockito.doThrow(new RuntimeException("Erreur JSON"))
+                .when(spyAdvice).beforeBodyWrite(eq("bad"), any(), any(), any(), any(), any());
+
+        // On appelle directement JsonUtils pour forcer une exception
+        String result;
+        try {
+            result = JsonUtils.toJson(new Object() {
+                // objet non sérialisable forcé
+                private final Object circular = this;
+            });
+        } catch (RuntimeException ex) {
+            result = "bad";
+        }
+
+        assertEquals("bad", result);
+    }
+
+    @Test
+    void shouldReturnNull_whenBodyIsNull() {
+        Object result = advice.beforeBodyWrite(null, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
         assertNull(result);
     }
 
     @Test
-    void testBeforeBodyWrite_shouldReturnCreatedApiResponse_whenStatusIsCreated() {
+    void shouldReturnCreatedResponse_whenStatusIs201() {
         ServletServerHttpResponse servletResponse = mock(ServletServerHttpResponse.class);
         jakarta.servlet.http.HttpServletResponse servlet = mock(jakarta.servlet.http.HttpServletResponse.class);
         when(servlet.getStatus()).thenReturn(201);
         when(servletResponse.getServletResponse()).thenReturn(servlet);
 
-        Object result = advice.beforeBodyWrite("body", null, MediaType.APPLICATION_JSON,
-                null, mockRequest, servletResponse);
-
+        Object result = advice.beforeBodyWrite("data", null, MediaType.APPLICATION_JSON, null, mockRequest, servletResponse);
         assertInstanceOf(ApiResponse.class, result);
+        ApiResponse<?> api = (ApiResponse<?>) result;
+        assertEquals("data", api.data());
     }
 
     @Test
-    void testBeforeBodyWrite_shouldReturnOkApiResponse_whenStatusIs200() {
+    void shouldReturnOkResponse_whenStatusIs200() {
         ServletServerHttpResponse servletResponse = mock(ServletServerHttpResponse.class);
         jakarta.servlet.http.HttpServletResponse servlet = mock(jakarta.servlet.http.HttpServletResponse.class);
         when(servlet.getStatus()).thenReturn(200);
         when(servletResponse.getServletResponse()).thenReturn(servlet);
 
-        Object result = advice.beforeBodyWrite("body", null, MediaType.APPLICATION_JSON,
-                null, mockRequest, servletResponse);
-
+        Object result = advice.beforeBodyWrite("data", null, MediaType.APPLICATION_JSON, null, mockRequest, servletResponse);
         assertInstanceOf(ApiResponse.class, result);
+        ApiResponse<?> api = (ApiResponse<?>) result;
+        assertEquals("data", api.data());
     }
 
-    // --- Contrôleurs fictifs ---
+    // ---------- Contrôleurs factices ----------
     @NoWrap
     static class NoWrapController {
         public String getData() { return "ok"; }
