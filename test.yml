@@ -4,6 +4,7 @@ import com.lma.apiresponse.api.exception.ApiException;
 import com.lma.apiresponse.api.exception.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -21,7 +22,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@org.junit.jupiter.api.extension.ExtendWith(MockitoExtension.class)
+@ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class GlobalExceptionHandlerTest {
 
@@ -36,12 +37,24 @@ class GlobalExceptionHandlerTest {
         when(request.getDescription(false)).thenReturn("uri=/api/test");
     }
 
+    // 🔹 Classe concrète pour tester la classe abstraite ApiException
+    static class TestApiException extends ApiException {
+        public TestApiException(String code, String message, HttpStatus status, ErrorType type) {
+            super(type, status.value(), code, message);
+        }
+    }
+
     // ---------------------------------------------------
     // 1️⃣ handleApi(ApiException)
     // ---------------------------------------------------
     @Test
     void testHandleApi_shouldReturnExpectedResponse() {
-        ApiException ex = new ApiException("USER_NOT_FOUND", "User not found", HttpStatus.NOT_FOUND, ErrorType.RESOURCE_NOT_FOUND);
+        ApiException ex = new TestApiException(
+                "USER_NOT_FOUND",
+                "User not found",
+                HttpStatus.NOT_FOUND,
+                ErrorType.RESOURCE_NOT_FOUND
+        );
 
         ResponseEntity<ProblemPayload> response = handler.handleApi(ex, request);
 
@@ -58,6 +71,7 @@ class GlobalExceptionHandlerTest {
         assertTrue(body.getInstance().contains("/api/test"));
         assertNotNull(body.getTraceId());
         assertTrue(((Map<?, ?>) body.getExtension()).containsKey("code"));
+        assertEquals("USER_NOT_FOUND", body.getExtension().get("code"));
     }
 
     // ---------------------------------------------------
@@ -65,7 +79,7 @@ class GlobalExceptionHandlerTest {
     // ---------------------------------------------------
     @Test
     void testHandleValidation_shouldReturnBadRequestWithErrors() {
-        // Mock FieldError
+        // Mock FieldErrors
         FieldError fieldError1 = new FieldError("user", "email", "Invalid email");
         FieldError fieldError2 = new FieldError("user", "name", "Name is required");
 
@@ -79,9 +93,9 @@ class GlobalExceptionHandlerTest {
 
         assertNotNull(response);
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+
         ProblemPayload body = response.getBody();
         assertNotNull(body);
-
         assertEquals("validation_error", body.getType());
         assertEquals("Validation failed", body.getTitle());
         assertEquals(400, body.getStatus());
@@ -114,7 +128,9 @@ class GlobalExceptionHandlerTest {
         assertEquals("Internal Server Error", body.getTitle());
         assertEquals(500, body.getStatus());
         assertEquals("An unexpected error occurred.", body.getDetail());
-        assertTrue(body.getExtension().containsKey("code"));
-        assertEquals("INT-500", body.getExtension().get("code"));
+
+        Map<String, Object> ext = body.getExtension();
+        assertTrue(ext.containsKey("code"));
+        assertEquals("INT-500", ext.get("code"));
     }
 }
