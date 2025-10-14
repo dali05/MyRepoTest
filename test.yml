@@ -1,154 +1,57 @@
-package com.lma.apiresponse.api.exception.web;
+package com.lma.apiresponse.api.exception;
 
-import com.lma.apiresponse.api.exception.ApiException;
-import com.lma.apiresponse.api.exception.ErrorType;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.context.request.WebRequest;
-
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
-class GlobalExceptionHandlerTest {
+/**
+ * Tests unitaires pour BusinessRuleException.
+ */
+class BusinessRuleExceptionTest {
 
-    private GlobalExceptionHandler handler;
+    enum DummyBusinessErrorCode implements BusinessErrorCode {
+        INVALID_AMOUNT("BUS-001", "Invalid amount"),
+        ACCOUNT_LOCKED("BUS-002", "Account is locked");
 
-    @Mock
-    private WebRequest request;
+        private final String code;
+        private final String defaultMessage;
 
-    @BeforeEach
-    void setUp() {
-        handler = new GlobalExceptionHandler();
-        when(request.getDescription(false)).thenReturn("uri=/api/test");
-    }
+        DummyBusinessErrorCode(String code, String defaultMessage) {
+            this.code = code;
+            this.defaultMessage = defaultMessage;
+        }
 
-    // 🔹 Sous-classe concrète pour tester ApiException abstraite
-    static class TestApiException extends ApiException {
-        public TestApiException(String code, String message, HttpStatus status, ErrorType type) {
-            super(type, status.value(), code, message);
+        @Override
+        public String code() {
+            return code;
+        }
+
+        @Override
+        public String defaultMessage() {
+            return defaultMessage;
         }
     }
 
-    // ---------------------------------------------------
-    // 1️⃣ handleApi(ApiException)
-    // ---------------------------------------------------
     @Test
-    void testHandleApi_shouldReturnExpectedResponse() {
-        ApiException ex = new TestApiException(
-                "USER_NOT_FOUND",
-                "User not found",
-                HttpStatus.NOT_FOUND,
-                ErrorType.RESOURCE_NOT_FOUND
-        );
+    void testConstructor_usesDefaultMessage() {
+        BusinessRuleException ex = new BusinessRuleException(DummyBusinessErrorCode.INVALID_AMOUNT);
 
-        ResponseEntity<ProblemPayload> response = handler.handleApi(ex, request);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertEquals("application/json", response.getHeaders().getContentType().toString());
-
-        ProblemPayload body = response.getBody();
-        assertNotNull(body);
-        assertEquals("resource_not_found", body.type());
-        assertEquals("Resource not found", body.title());
-        assertEquals(404, body.status());
-        assertEquals("User not found", body.detail());
-        assertTrue(body.instance().contains("/api/test"));
-        assertNotNull(body.traceId());
-        assertTrue(((Map<?, ?>) body.extensions()).containsKey("code"));
-        assertEquals("USER_NOT_FOUND", body.extensions().get("code"));
+        assertEquals(ErrorType.BUSINESS_ERROR, ex.getType());
+        assertEquals(422, ex.getStatus());
+        assertEquals("BUS-001", ex.getCode());
+        assertEquals("Invalid amount", ex.getMessage());
+        assertEquals(DummyBusinessErrorCode.INVALID_AMOUNT, ex.getBusinessError());
     }
 
-    // ---------------------------------------------------
-    // 2️⃣ handleApi() avec tous les ErrorType pour couvrir typeFor() et titleFor()
-    // ---------------------------------------------------
     @Test
-    void testHandleApi_shouldHandleAllErrorTypes() {
-        for (ErrorType type : EnumSet.allOf(ErrorType.class)) {
-            ApiException ex = new TestApiException("CODE", "Message", HttpStatus.BAD_REQUEST, type);
-            ResponseEntity<ProblemPayload> response = handler.handleApi(ex, request);
+    void testConstructor_usesCustomMessage() {
+        BusinessRuleException ex = new BusinessRuleException(DummyBusinessErrorCode.ACCOUNT_LOCKED, "This account cannot be used");
 
-            assertNotNull(response.getBody());
-            ProblemPayload body = response.getBody();
-
-            // Vérifie que chaque type et title correspondent au mapping attendu
-            assertNotNull(body.type(), "typeFor() devrait retourner une valeur non nulle pour " + type);
-            assertNotNull(body.title(), "titleFor() devrait retourner un titre non nul pour " + type);
-        }
-    }
-
-    // ---------------------------------------------------
-    // 3️⃣ handleValidation(MethodArgumentNotValidException)
-    // ---------------------------------------------------
-    @Test
-    void testHandleValidation_shouldReturnBadRequestWithErrors() {
-        FieldError fieldError1 = new FieldError("user", "email", "Invalid email");
-        FieldError fieldError2 = new FieldError("user", "name", "Name is required");
-
-        BindingResult bindingResult = mock(BindingResult.class);
-        when(bindingResult.getFieldErrors()).thenReturn(List.of(fieldError1, fieldError2));
-
-        MethodArgumentNotValidException ex =
-                new MethodArgumentNotValidException(null, bindingResult);
-
-        ResponseEntity<ProblemPayload> response = handler.handleValidation(ex, request);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-
-        ProblemPayload body = response.getBody();
-        assertNotNull(body);
-        assertEquals("validation_error", body.type());
-        assertEquals("Validation failed", body.title());
-        assertEquals(400, body.status());
-        assertEquals("One or more inputs are invalid.", body.detail());
-
-        Map<String, Object> ext = body.extensions();
-        assertTrue(ext.containsKey("errors"));
-
-        Map<String, Object> errors = (Map<String, Object>) ext.get("errors");
-        assertEquals(2, errors.size());
-        assertEquals("Invalid email", errors.get("email"));
-        assertEquals("Name is required", errors.get("name"));
-    }
-
-    // ---------------------------------------------------
-    // 4️⃣ handleUnknown(Exception)
-    // ---------------------------------------------------
-    @Test
-    void testHandleUnknown_shouldReturnInternalServerError() {
-        Exception ex = new RuntimeException("Unexpected error");
-
-        ResponseEntity<ProblemPayload> response = handler.handleUnknown(ex, request);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-
-        ProblemPayload body = response.getBody();
-        assertNotNull(body);
-        assertEquals("internal_error", body.type());
-        assertEquals("Internal Server Error", body.title());
-        assertEquals(500, body.status());
-        assertEquals("An unexpected error occurred.", body.detail());
-
-        Map<String, Object> ext = body.extensions();
-        assertTrue(ext.containsKey("code"));
-        assertEquals("INT-500", ext.get("code"));
+        assertEquals(ErrorType.BUSINESS_ERROR, ex.getType());
+        assertEquals(422, ex.getStatus());
+        assertEquals("BUS-002", ex.getCode());
+        assertEquals("This account cannot be used", ex.getMessage());
+        assertEquals(DummyBusinessErrorCode.ACCOUNT_LOCKED, ex.getBusinessError());
     }
 }
