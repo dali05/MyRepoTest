@@ -16,6 +16,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.WebRequest;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +38,7 @@ class GlobalExceptionHandlerTest {
         when(request.getDescription(false)).thenReturn("uri=/api/test");
     }
 
-    // 🔹 Classe concrète pour tester la classe abstraite ApiException
+    // 🔹 Sous-classe concrète pour tester ApiException abstraite
     static class TestApiException extends ApiException {
         public TestApiException(String code, String message, HttpStatus status, ErrorType type) {
             super(type, status.value(), code, message);
@@ -64,22 +65,39 @@ class GlobalExceptionHandlerTest {
 
         ProblemPayload body = response.getBody();
         assertNotNull(body);
-        assertEquals("resource_not_found", body.getType());
-        assertEquals("Resource not found", body.getTitle());
-        assertEquals(404, body.getStatus());
-        assertEquals("User not found", body.getDetail());
-        assertTrue(body.getInstance().contains("/api/test"));
-        assertNotNull(body.getTraceId());
-        assertTrue(((Map<?, ?>) body.getExtension()).containsKey("code"));
-        assertEquals("USER_NOT_FOUND", body.getExtension().get("code"));
+        assertEquals("resource_not_found", body.type());
+        assertEquals("Resource not found", body.title());
+        assertEquals(404, body.status());
+        assertEquals("User not found", body.detail());
+        assertTrue(body.instance().contains("/api/test"));
+        assertNotNull(body.traceId());
+        assertTrue(((Map<?, ?>) body.extensions()).containsKey("code"));
+        assertEquals("USER_NOT_FOUND", body.extensions().get("code"));
     }
 
     // ---------------------------------------------------
-    // 2️⃣ handleValidation(MethodArgumentNotValidException)
+    // 2️⃣ handleApi() avec tous les ErrorType pour couvrir typeFor() et titleFor()
+    // ---------------------------------------------------
+    @Test
+    void testHandleApi_shouldHandleAllErrorTypes() {
+        for (ErrorType type : EnumSet.allOf(ErrorType.class)) {
+            ApiException ex = new TestApiException("CODE", "Message", HttpStatus.BAD_REQUEST, type);
+            ResponseEntity<ProblemPayload> response = handler.handleApi(ex, request);
+
+            assertNotNull(response.getBody());
+            ProblemPayload body = response.getBody();
+
+            // Vérifie que chaque type et title correspondent au mapping attendu
+            assertNotNull(body.type(), "typeFor() devrait retourner une valeur non nulle pour " + type);
+            assertNotNull(body.title(), "titleFor() devrait retourner un titre non nul pour " + type);
+        }
+    }
+
+    // ---------------------------------------------------
+    // 3️⃣ handleValidation(MethodArgumentNotValidException)
     // ---------------------------------------------------
     @Test
     void testHandleValidation_shouldReturnBadRequestWithErrors() {
-        // Mock FieldErrors
         FieldError fieldError1 = new FieldError("user", "email", "Invalid email");
         FieldError fieldError2 = new FieldError("user", "name", "Name is required");
 
@@ -96,12 +114,12 @@ class GlobalExceptionHandlerTest {
 
         ProblemPayload body = response.getBody();
         assertNotNull(body);
-        assertEquals("validation_error", body.getType());
-        assertEquals("Validation failed", body.getTitle());
-        assertEquals(400, body.getStatus());
-        assertEquals("One or more inputs are invalid.", body.getDetail());
+        assertEquals("validation_error", body.type());
+        assertEquals("Validation failed", body.title());
+        assertEquals(400, body.status());
+        assertEquals("One or more inputs are invalid.", body.detail());
 
-        Map<String, Object> ext = body.getExtension();
+        Map<String, Object> ext = body.extensions();
         assertTrue(ext.containsKey("errors"));
 
         Map<String, Object> errors = (Map<String, Object>) ext.get("errors");
@@ -111,7 +129,7 @@ class GlobalExceptionHandlerTest {
     }
 
     // ---------------------------------------------------
-    // 3️⃣ handleUnknown(Exception)
+    // 4️⃣ handleUnknown(Exception)
     // ---------------------------------------------------
     @Test
     void testHandleUnknown_shouldReturnInternalServerError() {
@@ -124,12 +142,12 @@ class GlobalExceptionHandlerTest {
 
         ProblemPayload body = response.getBody();
         assertNotNull(body);
-        assertEquals("internal_error", body.getType());
-        assertEquals("Internal Server Error", body.getTitle());
-        assertEquals(500, body.getStatus());
-        assertEquals("An unexpected error occurred.", body.getDetail());
+        assertEquals("internal_error", body.type());
+        assertEquals("Internal Server Error", body.title());
+        assertEquals(500, body.status());
+        assertEquals("An unexpected error occurred.", body.detail());
 
-        Map<String, Object> ext = body.getExtension();
+        Map<String, Object> ext = body.extensions();
         assertTrue(ext.containsKey("code"));
         assertEquals("INT-500", ext.get("code"));
     }
