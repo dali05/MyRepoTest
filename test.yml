@@ -1,79 +1,120 @@
-package com.lma.apiresponse.api.response;
+package com.lma.apiresponse.storage.service;
 
+import com.ibm.cloud.objectstorage.services.s3.AmazonS3;
+import com.ibm.cloud.objectstorage.services.s3.model.*;
+import com.lma.apiresponse.storage.S3StorageProperties;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Map;
+import java.io.*;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-class MetaBuilderTest {
+class S3StorageServiceTest {
 
+    @Mock
+    private AmazonS3 s3Client;
+
+    @Mock
+    private MultipartFile multipartFile;
+
+    @InjectMocks
+    private S3StorageService service;
+
+    private S3StorageProperties props;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        MockitoAnnotations.openMocks(this);
+        props = new S3StorageProperties();
+        props.setBucket("test-bucket");
+        props.setEndpoint("http://localhost");
+        props.setAccessKey("key");
+        props.setSecretKey("secret");
+        props.setRegion("eu-de");
+
+        service = new S3StorageService(s3Client, props);
+    }
+
+    // ----------------------------------------------------------
+    // 1️⃣ uploadFile
+    // ----------------------------------------------------------
     @Test
-    void testCreate_shouldContainTimestampAndRequestId() {
-        Map<String, Object> meta = MetaBuilder.create().build();
+    void uploadFile_shouldUploadAndReturnMessage() throws IOException {
+        byte[] content = "hello".getBytes();
+        when(multipartFile.getBytes()).thenReturn(content);
+        when(multipartFile.getOriginalFilename()).thenReturn("file.txt");
 
-        assertNotNull(meta.get("timestamp"));
-        assertNotNull(meta.get("requestId"));
-        assertTrue(meta.get("timestamp") instanceof String);
-        assertTrue(meta.get("requestId") instanceof String);
+        String result = service.uploadFile(multipartFile);
+
+        verify(s3Client, times(1))
+                .putObject(any(PutObjectRequest.class));
+
+        assertTrue(result.contains("File uploaded"));
     }
 
     @Test
-    void testPut_shouldAddKeyValue() {
-        MetaBuilder builder = new MetaBuilder()
-                .put("env", "test");
+    void uploadFile_shouldThrowIOException_whenFileWriteFails() throws IOException {
+        MultipartFile badFile = mock(MultipartFile.class);
+        when(badFile.getBytes()).thenThrow(new IOException("write fail"));
 
-        Map<String, Object> result = builder.build();
-        assertEquals("test", result.get("env"));
+        assertThrows(IOException.class, () -> service.uploadFile(badFile));
     }
 
+    // ----------------------------------------------------------
+    // 2️⃣ downloadFile
+    // ----------------------------------------------------------
     @Test
-    void testPutIfPresent_shouldAddOnlyIfNotNull() {
-        MetaBuilder builder = new MetaBuilder()
-                .putIfPresent("key1", "value1")
-                .putIfPresent("key2", null);
+    void downloadFile_shouldReturnInputStream() {
+        S3Object s3Object = mock(S3Object.class);
+        InputStream inputStream = new ByteArrayInputStream("data".getBytes());
 
-        Map<String, Object> result = builder.build();
-        assertEquals(1, result.size());
-        assertEquals("value1", result.get("key1"));
-        assertFalse(result.containsKey("key2"));
+        when(s3Object.getObjectContent()).thenReturn(new S3ObjectInputStream(inputStream, null));
+        when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(s3Object);
+
+        InputStream result = service.downloadFile("test.txt");
+
+        assertNotNull(result);
     }
 
+    // ----------------------------------------------------------
+    // 3️⃣ listFiles
+    // ----------------------------------------------------------
     @Test
-    void testPagination_shouldAddPaginationInfo() {
-        MetaBuilder builder = new MetaBuilder()
-                .pagination(2, 10, 55);
+    void listFiles_shouldReturnFileKeys() {
+        ObjectListing listing = mock(ObjectListing.class);
+        S3ObjectSummary s1 = new S3ObjectSummary();
+        s1.setKey("file1.txt");
+        S3ObjectSummary s2 = new S3ObjectSummary();
+        s2.setKey("file2.txt");
 
-        Map<String, Object> result = builder.build();
+        when(listing.getObjectSummaries()).thenReturn(List.of(s1, s2));
+        when(s3Client.listObjects("test-bucket")).thenReturn(listing);
 
-        assertTrue(result.containsKey("pagination"));
-        Map<String, Object> pagination = (Map<String, Object>) result.get("pagination");
+        List<String> result = service.listFiles();
 
-        assertEquals(2L, pagination.get("page"));
-        assertEquals(10L, pagination.get("size"));
-        assertEquals(55L, pagination.get("total"));
+        assertEquals(2, result.size());
+        assertTrue(result.contains("file1.txt"));
+        assertTrue(result.contains("file2.txt"));
     }
 
+    // ----------------------------------------------------------
+    // 4️⃣ convertMultipartToFile (indirect test)
+    // ----------------------------------------------------------
     @Test
-    void testCombineMethods_shouldBuildFullMeta() {
-        MetaBuilder builder = MetaBuilder.create()
-                .put("version", "1.0")
-                .putIfPresent("author", "LMA")
-                .pagination(1, 20, 100);
+    void uploadFile_shouldCreateAndDeleteTempFile() throws IOException {
+        byte[] bytes = "content".getBytes();
+        when(multipartFile.getBytes()).thenReturn(bytes);
+        when(multipartFile.getOriginalFilename()).thenReturn("sample.txt");
 
-        Map<String, Object> meta = builder.build();
+        String result = service.uploadFile(multipartFile);
 
-        assertTrue(meta.containsKey("timestamp"));
-        assertTrue(meta.containsKey("requestId"));
-        assertTrue(meta.containsKey("pagination"));
-        assertEquals("1.0", meta.get("version"));
-        assertEquals("LMA", meta.get("author"));
-
-        Map<String, Object> pagination = (Map<String, Object>) meta.get("pagination");
-        assertEquals(1L, pagination.get("page"));
-        assertEquals(20L, pagination.get("size"));
-        assertEquals(100L, pagination.get("total"));
+        assertTrue(result.contains("File uploaded"));
+        verify(s3Client, times(1)).putObject(any(PutObjectRequest.class));
     }
 }
-
-
