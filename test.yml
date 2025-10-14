@@ -1,78 +1,120 @@
-package com.lma.apiresponse.api.config;
+package com.lma.apiresponse.api.exception.web;
 
+import com.lma.apiresponse.api.exception.ApiException;
+import com.lma.apiresponse.api.exception.ErrorType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
-import org.springframework.web.util.pattern.PathPatternParser;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.context.request.WebRequest;
 
-import java.util.function.Predicate;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class ApiPrefixConfigTest {
+@org.junit.jupiter.api.extension.ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class GlobalExceptionHandlerTest {
 
-    private ApiPrefixConfig config;
-    private PathMatchConfigurer configurer;
+    private GlobalExceptionHandler handler;
+
+    @Mock
+    private WebRequest request;
 
     @BeforeEach
     void setUp() {
-        config = new ApiPrefixConfig();
-        configurer = mock(PathMatchConfigurer.class);
+        handler = new GlobalExceptionHandler();
+        when(request.getDescription(false)).thenReturn("uri=/api/test");
     }
 
+    // ---------------------------------------------------
+    // 1️⃣ handleApi(ApiException)
+    // ---------------------------------------------------
     @Test
-    void testConfigurePathMatch_addsPrefixCorrectly() {
-        // Arrange
-        ArgumentCaptor<Predicate<Class<?>>> predicateCaptor = ArgumentCaptor.forClass(Predicate.class);
-        when(configurer.addPathPrefix(eq("/api"), predicateCaptor.capture())).thenReturn(configurer);
+    void testHandleApi_shouldReturnExpectedResponse() {
+        ApiException ex = new ApiException("USER_NOT_FOUND", "User not found", HttpStatus.NOT_FOUND, ErrorType.RESOURCE_NOT_FOUND);
 
-        // Act
-        config.configurePathMatch(configurer);
+        ResponseEntity<ProblemPayload> response = handler.handleApi(ex, request);
 
-        // Assert
-        verify(configurer, times(1)).addPathPrefix(eq("/api"), any());
+        assertNotNull(response);
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals("application/json", response.getHeaders().getContentType().toString());
 
-        // Simule un contrôleur dans le bon package
-        @RestController
-        class MyController {}
-        boolean match = predicateCaptor.getValue().test(MyController.class);
-        assertTrue(match, "Controllers du package cible devraient avoir le préfixe /api");
+        ProblemPayload body = response.getBody();
+        assertNotNull(body);
+        assertEquals("resource_not_found", body.getType());
+        assertEquals("Resource not found", body.getTitle());
+        assertEquals(404, body.getStatus());
+        assertEquals("User not found", body.getDetail());
+        assertTrue(body.getInstance().contains("/api/test"));
+        assertNotNull(body.getTraceId());
+        assertTrue(((Map<?, ?>) body.getExtension()).containsKey("code"));
     }
 
+    // ---------------------------------------------------
+    // 2️⃣ handleValidation(MethodArgumentNotValidException)
+    // ---------------------------------------------------
     @Test
-    void testConfigurePathMatch_doesNotAddPrefixForOtherPackages() {
-        // Arrange
-        ArgumentCaptor<Predicate<Class<?>>> predicateCaptor = ArgumentCaptor.forClass(Predicate.class);
-        when(configurer.addPathPrefix(eq("/api"), predicateCaptor.capture())).thenReturn(configurer);
+    void testHandleValidation_shouldReturnBadRequestWithErrors() {
+        // Mock FieldError
+        FieldError fieldError1 = new FieldError("user", "email", "Invalid email");
+        FieldError fieldError2 = new FieldError("user", "name", "Name is required");
 
-        // Act
-        config.configurePathMatch(configurer);
+        BindingResult bindingResult = mock(BindingResult.class);
+        when(bindingResult.getFieldErrors()).thenReturn(List.of(fieldError1, fieldError2));
 
-        // Simule un contrôleur dans un autre package
-        @RestController
-        class ExternalController {
-        }
+        MethodArgumentNotValidException ex =
+                new MethodArgumentNotValidException(null, bindingResult);
 
-        // Fake package différent
-        assertFalse(predicateCaptor.getValue().test(ExternalController.class),
-                "Les contrôleurs hors de com.lma.apiresponse.controller ne doivent pas être préfixés");
+        ResponseEntity<ProblemPayload> response = handler.handleValidation(ex, request);
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        ProblemPayload body = response.getBody();
+        assertNotNull(body);
+
+        assertEquals("validation_error", body.getType());
+        assertEquals("Validation failed", body.getTitle());
+        assertEquals(400, body.getStatus());
+        assertEquals("One or more inputs are invalid.", body.getDetail());
+
+        Map<String, Object> ext = body.getExtension();
+        assertTrue(ext.containsKey("errors"));
+
+        Map<String, Object> errors = (Map<String, Object>) ext.get("errors");
+        assertEquals(2, errors.size());
+        assertEquals("Invalid email", errors.get("email"));
+        assertEquals("Name is required", errors.get("name"));
     }
 
+    // ---------------------------------------------------
+    // 3️⃣ handleUnknown(Exception)
+    // ---------------------------------------------------
     @Test
-    void testConfigurePathMatch_doesNotFailWhenNoRestControllerAnnotation() {
-        // Arrange
-        ArgumentCaptor<Predicate<Class<?>>> predicateCaptor = ArgumentCaptor.forClass(Predicate.class);
-        when(configurer.addPathPrefix(eq("/api"), predicateCaptor.capture())).thenReturn(configurer);
+    void testHandleUnknown_shouldReturnInternalServerError() {
+        Exception ex = new RuntimeException("Unexpected error");
 
-        // Act
-        config.configurePathMatch(configurer);
+        ResponseEntity<ProblemPayload> response = handler.handleUnknown(ex, request);
 
-        // Contrôleur sans @RestController
-        class SimpleClass {}
-        assertFalse(predicateCaptor.getValue().test(SimpleClass.class),
-                "Les classes sans @RestController ne doivent pas être préfixées");
+        assertNotNull(response);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+
+        ProblemPayload body = response.getBody();
+        assertNotNull(body);
+        assertEquals("internal_error", body.getType());
+        assertEquals("Internal Server Error", body.getTitle());
+        assertEquals(500, body.getStatus());
+        assertEquals("An unexpected error occurred.", body.getDetail());
+        assertTrue(body.getExtension().containsKey("code"));
+        assertEquals("INT-500", body.getExtension().get("code"));
     }
 }
