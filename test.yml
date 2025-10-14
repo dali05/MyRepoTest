@@ -1,168 +1,79 @@
 package com.lma.apiresponse.api.response;
 
-import com.lma.apiresponse.api.annotation.NoWrap;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.core.MethodParameter;
-import org.springframework.http.*;
-import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.http.server.ServletServerHttpResponse;
 
-import java.lang.reflect.Method;
-import java.net.URI;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
-class SuccessResponseBodyAdviceTest {
-
-    private SuccessResponseBodyAdvice advice;
-    private ServerHttpRequest mockRequest;
-    private ServerHttpResponse mockResponse;
-
-    @BeforeEach
-    void setup() {
-        advice = new SuccessResponseBodyAdvice();
-        mockRequest = mock(ServerHttpRequest.class);
-        mockResponse = mock(ServerHttpResponse.class);
-        when(mockRequest.getURI()).thenReturn(URI.create("http://localhost/test"));
-    }
-
-    // ---------- supports() ----------
+class MetaBuilderTest {
 
     @Test
-    void supports_shouldReturnFalse_whenClassAnnotatedWithNoWrap() throws Exception {
-        Method method = NoWrapController.class.getMethod("getData");
-        MethodParameter param = new MethodParameter(method, -1);
-        assertFalse(advice.supports(param, (Class<? extends HttpMessageConverter<?>>) null));
+    void testCreate_shouldContainTimestampAndRequestId() {
+        Map<String, Object> meta = MetaBuilder.create().build();
+
+        assertNotNull(meta.get("timestamp"));
+        assertNotNull(meta.get("requestId"));
+        assertTrue(meta.get("timestamp") instanceof String);
+        assertTrue(meta.get("requestId") instanceof String);
     }
 
     @Test
-    void supports_shouldReturnFalse_whenMethodAnnotatedWithNoWrap() throws Exception {
-        Method method = NormalController.class.getMethod("noWrapMethod");
-        MethodParameter param = new MethodParameter(method, -1);
-        assertFalse(advice.supports(param, (Class<? extends HttpMessageConverter<?>>) null));
+    void testPut_shouldAddKeyValue() {
+        MetaBuilder builder = new MetaBuilder()
+                .put("env", "test");
+
+        Map<String, Object> result = builder.build();
+        assertEquals("test", result.get("env"));
     }
 
     @Test
-    void supports_shouldReturnTrue_whenNoAnnotation() throws Exception {
-        Method method = NormalController.class.getMethod("normalMethod");
-        MethodParameter param = new MethodParameter(method, -1);
-        assertTrue(advice.supports(param, (Class<? extends HttpMessageConverter<?>>) null));
-    }
+    void testPutIfPresent_shouldAddOnlyIfNotNull() {
+        MetaBuilder builder = new MetaBuilder()
+                .putIfPresent("key1", "value1")
+                .putIfPresent("key2", null);
 
-    // ---------- beforeBodyWrite() ----------
-
-    @Test
-    void shouldReturnSameApiResponse_whenBodyIsApiResponse() {
-        ApiResponse<String> body = ApiResponse.ok("data", Map.of());
-        Object result = advice.beforeBodyWrite(body, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
-        assertSame(body, result);
+        Map<String, Object> result = builder.build();
+        assertEquals(1, result.size());
+        assertEquals("value1", result.get("key1"));
+        assertFalse(result.containsKey("key2"));
     }
 
     @Test
-    void shouldReturnSameResponseEntity_whenBodyIsResponseEntityWithApiResponse() {
-        ApiResponse<String> api = ApiResponse.ok("data", Map.of());
-        ResponseEntity<ApiResponse<String>> resp = ResponseEntity.ok(api);
+    void testPagination_shouldAddPaginationInfo() {
+        MetaBuilder builder = new MetaBuilder()
+                .pagination(2, 10, 55);
 
-        Object result = advice.beforeBodyWrite(resp, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
-        assertSame(resp, result);
+        Map<String, Object> result = builder.build();
+
+        assertTrue(result.containsKey("pagination"));
+        Map<String, Object> pagination = (Map<String, Object>) result.get("pagination");
+
+        assertEquals(2L, pagination.get("page"));
+        assertEquals(10L, pagination.get("size"));
+        assertEquals(55L, pagination.get("total"));
     }
 
     @Test
-    void shouldWrapResponseEntityWithNullBody() {
-        ResponseEntity<Object> resp = ResponseEntity.status(HttpStatus.ACCEPTED).body(null);
-        Object result = advice.beforeBodyWrite(resp, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
+    void testCombineMethods_shouldBuildFullMeta() {
+        MetaBuilder builder = MetaBuilder.create()
+                .put("version", "1.0")
+                .putIfPresent("author", "LMA")
+                .pagination(1, 20, 100);
 
-        assertInstanceOf(ResponseEntity.class, result);
-        ResponseEntity<?> re = (ResponseEntity<?>) result;
-        assertInstanceOf(ApiResponse.class, re.getBody());
-        assertEquals(HttpStatus.ACCEPTED, re.getStatusCode());
-    }
+        Map<String, Object> meta = builder.build();
 
-    @Test
-    void shouldWrapResponseEntityWithNormalBody() {
-        ResponseEntity<String> resp = ResponseEntity.ok("body");
-        Object result = advice.beforeBodyWrite(resp, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
+        assertTrue(meta.containsKey("timestamp"));
+        assertTrue(meta.containsKey("requestId"));
+        assertTrue(meta.containsKey("pagination"));
+        assertEquals("1.0", meta.get("version"));
+        assertEquals("LMA", meta.get("author"));
 
-        assertInstanceOf(ResponseEntity.class, result);
-        ResponseEntity<?> re = (ResponseEntity<?>) result;
-        assertInstanceOf(ApiResponse.class, re.getBody());
-    }
-
-    @Test
-    void shouldReturnJsonString_whenBodyIsString() {
-        Object result = advice.beforeBodyWrite("hello", null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
-        assertTrue(result instanceof String);
-        assertTrue(((String) result).contains("\"data\":\"hello\""));
-    }
-
-    @Test
-    void shouldReturnRawString_whenJsonConversionFails() {
-        // Simuler une exception dans JsonUtils
-        SuccessResponseBodyAdvice spyAdvice = Mockito.spy(advice);
-        Mockito.doThrow(new RuntimeException("Erreur JSON"))
-                .when(spyAdvice).beforeBodyWrite(eq("bad"), any(), any(), any(), any(), any());
-
-        // On appelle directement JsonUtils pour forcer une exception
-        String result;
-        try {
-            result = JsonUtils.toJson(new Object() {
-                // objet non sérialisable forcé
-                private final Object circular = this;
-            });
-        } catch (RuntimeException ex) {
-            result = "bad";
-        }
-
-        assertEquals("bad", result);
-    }
-
-    @Test
-    void shouldReturnNull_whenBodyIsNull() {
-        Object result = advice.beforeBodyWrite(null, null, MediaType.APPLICATION_JSON, null, mockRequest, mockResponse);
-        assertNull(result);
-    }
-
-    @Test
-    void shouldReturnCreatedResponse_whenStatusIs201() {
-        ServletServerHttpResponse servletResponse = mock(ServletServerHttpResponse.class);
-        jakarta.servlet.http.HttpServletResponse servlet = mock(jakarta.servlet.http.HttpServletResponse.class);
-        when(servlet.getStatus()).thenReturn(201);
-        when(servletResponse.getServletResponse()).thenReturn(servlet);
-
-        Object result = advice.beforeBodyWrite("data", null, MediaType.APPLICATION_JSON, null, mockRequest, servletResponse);
-        assertInstanceOf(ApiResponse.class, result);
-        ApiResponse<?> api = (ApiResponse<?>) result;
-        assertEquals("data", api.data());
-    }
-
-    @Test
-    void shouldReturnOkResponse_whenStatusIs200() {
-        ServletServerHttpResponse servletResponse = mock(ServletServerHttpResponse.class);
-        jakarta.servlet.http.HttpServletResponse servlet = mock(jakarta.servlet.http.HttpServletResponse.class);
-        when(servlet.getStatus()).thenReturn(200);
-        when(servletResponse.getServletResponse()).thenReturn(servlet);
-
-        Object result = advice.beforeBodyWrite("data", null, MediaType.APPLICATION_JSON, null, mockRequest, servletResponse);
-        assertInstanceOf(ApiResponse.class, result);
-        ApiResponse<?> api = (ApiResponse<?>) result;
-        assertEquals("data", api.data());
-    }
-
-    // ---------- Contrôleurs factices ----------
-    @NoWrap
-    static class NoWrapController {
-        public String getData() { return "ok"; }
-    }
-
-    static class NormalController {
-        @NoWrap
-        public String noWrapMethod() { return "ignored"; }
-        public String normalMethod() { return "wrapped"; }
+        Map<String, Object> pagination = (Map<String, Object>) meta.get("pagination");
+        assertEquals(1L, pagination.get("page"));
+        assertEquals(20L, pagination.get("size"));
+        assertEquals(100L, pagination.get("total"));
     }
 }
+
+
