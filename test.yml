@@ -1,73 +1,28 @@
-package com.bnpp.pf.common.api.config;
+<build>
+  <plugins>
+    <!-- Plugin JaCoCo -->
+    <plugin>
+      <groupId>org.jacoco</groupId>
+      <artifactId>jacoco-maven-plugin</artifactId>
+      <version>0.8.11</version>
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
+      <executions>
+        <!-- Étape 1 : Instrumentation avant les tests -->
+        <execution>
+          <goals>
+            <goal>prepare-agent</goal>
+          </goals>
+        </execution>
 
-import static org.mockito.Mockito.*;
-
-class ApiPrefixConfigTest {
-
-    private ApiPrefixConfig config;
-    private PathMatchConfigurer configurer;
-    private ApiPrefixProperties props;
-
-    @BeforeEach
-    void setUp() {
-        props = new ApiPrefixProperties();
-        props.setPrefix("/api");
-        props.setControllerPath("com.bnpp.pf.common.api.controller");
-        props.setEnabled(true);
-
-        config = new ApiPrefixConfig(props);
-        configurer = mock(PathMatchConfigurer.class);
-    }
-
-    @Test
-    void shouldAddApiPrefixWithPredicate() {
-        config.configurePathMatch(configurer);
-
-        verify(configurer, times(1))
-                .addPathPrefix(eq("/api"), any());
-    }
-
-    @Test
-    void predicate_shouldReturnTrue_forControllerInConfiguredPackage() {
-        // recrée la même lambda que dans configurePathMatch
-        var predicate = (java.util.function.Predicate<Class<?>>)
-                c -> c.isAnnotationPresent(RestController.class)
-                        && c.getPackageName().startsWith(props.getControllerPath());
-
-        @RestController
-        class DummyController {}
-        boolean result = predicate.test(DummyController.class);
-
-        assert result;
-    }
-
-    @Test
-    void predicate_shouldReturnFalse_forClassWithoutAnnotation() {
-        var predicate = (java.util.function.Predicate<Class<?>>)
-                c -> c.isAnnotationPresent(RestController.class)
-                        && c.getPackageName().startsWith(props.getControllerPath());
-
-        class NotController {}
-        boolean result = predicate.test(NotController.class);
-
-        assert !result;
-    }
-
-    @Test
-    void predicate_shouldReturnFalse_forWrongPackage() {
-        @RestController
-        class OtherController {}
-        var predicate = (java.util.function.Predicate<Class<?>>)
-                c -> c.isAnnotationPresent(RestController.class)
-                        && c.getPackageName().startsWith(props.getControllerPath());
-
-        boolean result = predicate.test(OtherController.class);
-
-        assert !result;
-    }
-}
+        <!-- Étape 2 : Génération du rapport après les tests -->
+        <execution>
+          <id>report</id>
+          <phase>test</phase>
+          <goals>
+            <goal>report</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+  </plugins>
+</build>
