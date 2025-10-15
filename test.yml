@@ -4,8 +4,10 @@ metadata:
   name: wall-e-ingress
   namespace: ns-wall-e-springboot
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
+  ingressClassName: nginx
   rules:
   - host: wall-e.localhost
     http:
@@ -14,6 +16,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: wall-e-springboot
+            name: wall-e-backend
             port:
-              number: 8080
+              number: 443
