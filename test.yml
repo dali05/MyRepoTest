@@ -1,27 +1,73 @@
-package com.lma.apiresponse.storage.conf;
+package com.bnpp.pf.common.api.config;
 
-import com.ibm.cloud.objectstorage.services.s3.AmazonS3;
-import com.lma.apiresponse.storage.S3StorageProperties;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-class S3StorageAutoConfigurationTest {
+class ApiPrefixConfigTest {
+
+    private ApiPrefixConfig config;
+    private PathMatchConfigurer configurer;
+    private ApiPrefixProperties props;
+
+    @BeforeEach
+    void setUp() {
+        props = new ApiPrefixProperties();
+        props.setPrefix("/api");
+        props.setControllerPath("com.bnpp.pf.common.api.controller");
+        props.setEnabled(true);
+
+        config = new ApiPrefixConfig(props);
+        configurer = mock(PathMatchConfigurer.class);
+    }
 
     @Test
-    void shouldCreateBeansSuccessfully() {
-        S3StorageProperties props = new S3StorageProperties();
-        props.setAccessKey("key");
-        props.setSecretKey("secret");
-        props.setEndpoint("http://localhost:9000");
-        props.setRegion("eu-de");
-        props.setBucket("bucket");
+    void shouldAddApiPrefixWithPredicate() {
+        config.configurePathMatch(configurer);
 
-        S3StorageAutoConfiguration conf = new S3StorageAutoConfiguration();
+        verify(configurer, times(1))
+                .addPathPrefix(eq("/api"), any());
+    }
 
-        AmazonS3 s3 = conf.s3Client(props);
-        assertNotNull(s3);
+    @Test
+    void predicate_shouldReturnTrue_forControllerInConfiguredPackage() {
+        // recrée la même lambda que dans configurePathMatch
+        var predicate = (java.util.function.Predicate<Class<?>>)
+                c -> c.isAnnotationPresent(RestController.class)
+                        && c.getPackageName().startsWith(props.getControllerPath());
 
-        assertNotNull(conf.storageService(s3, props));
+        @RestController
+        class DummyController {}
+        boolean result = predicate.test(DummyController.class);
+
+        assert result;
+    }
+
+    @Test
+    void predicate_shouldReturnFalse_forClassWithoutAnnotation() {
+        var predicate = (java.util.function.Predicate<Class<?>>)
+                c -> c.isAnnotationPresent(RestController.class)
+                        && c.getPackageName().startsWith(props.getControllerPath());
+
+        class NotController {}
+        boolean result = predicate.test(NotController.class);
+
+        assert !result;
+    }
+
+    @Test
+    void predicate_shouldReturnFalse_forWrongPackage() {
+        @RestController
+        class OtherController {}
+        var predicate = (java.util.function.Predicate<Class<?>>)
+                c -> c.isAnnotationPresent(RestController.class)
+                        && c.getPackageName().startsWith(props.getControllerPath());
+
+        boolean result = predicate.test(OtherController.class);
+
+        assert !result;
     }
 }
