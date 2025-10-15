@@ -1,15 +1,11 @@
-package com.lma.apiresponse.kafka;
+package com.bnpp.pf.common.kafka;
 
-import io.confluent.kafka.serializers.KafkaAvroDeserializer;
-import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.common.config.SslConfigs;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.Mockito;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
 
@@ -21,105 +17,130 @@ import static org.mockito.Mockito.*;
 class KafkaAvroAutoConfigurationTest {
 
     private KafkaAvroAutoConfiguration config;
-
-    @Mock
     private KafkaAvroProperties props;
+    private KafkaAvroProperties.Broker broker;
+    private KafkaAvroProperties.SchemaRegistry schemaRegistry;
 
     @BeforeEach
     void setup() {
-        MockitoAnnotations.openMocks(this);
         config = new KafkaAvroAutoConfiguration();
-    }
+        props = mock(KafkaAvroProperties.class);
+        broker = new KafkaAvroProperties.Broker();
+        schemaRegistry = new KafkaAvroProperties.SchemaRegistry();
 
-    @Test
-    void producerFactory_shouldCreateFactoryWithExpectedConfigs() {
-        // given
-        KafkaAvroProperties props = mock(KafkaAvroProperties.class);
-        var schemaRegistry = new KafkaAvroProperties.SchemaRegistry();
-        schemaRegistry.setUrl("http://mock-schema:8081");
-        schemaRegistry.setSsl(new KafkaAvroProperties.Ssl());
-        var broker = new KafkaAvroProperties.Broker();
+        // valeurs par défaut
         broker.setBootstrapServers("localhost:9092");
         broker.setSsl(new KafkaAvroProperties.Ssl());
+        schemaRegistry.setUrl("http://mock-schema:8081");
+        schemaRegistry.setSsl(new KafkaAvroProperties.Ssl());
+
+        var producer = new KafkaAvroProperties.Producer();
+        producer.setEnableIdempotenceConfig(true);
+        producer.setAutoRegisterSchemas(true);
+
+        var consumer = new KafkaAvroProperties.Consumer();
+        consumer.setGroupId("test-group");
+        consumer.setSpecificAvroReaderConfig(true);
+        consumer.setAllowAutoCreateTopicsConfig(false);
+        consumer.setEnableAutoCommitConfig(false);
 
         when(props.getBroker()).thenReturn(broker);
         when(props.getSchemaRegistry()).thenReturn(schemaRegistry);
+        when(props.getProducer()).thenReturn(producer);
+        when(props.getConsumer()).thenReturn(consumer);
+        when(props.getAppId()).thenReturn("app-test");
+    }
 
-        // when
+    // ----------------- TEST PRODUCTEUR -----------------
+
+    @Test
+    void producerFactory_shouldReturnFactoryWithoutSSL() {
         ProducerFactory<String, Object> factory = config.producerFactory(props);
 
-        // then
-        assertThat(factory).isNotNull();
-        assertThat(factory.getConfigurationProperties())
-                .containsKeys(
-                        ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-                        ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-                        ProducerConfig.CLIENT_ID_CONFIG
-                );
+        assertThat(factory).isInstanceOf(DefaultKafkaProducerFactory.class);
+        Map<String, Object> conf = ((DefaultKafkaProducerFactory<String, Object>) factory).getConfigurationProperties();
+        assertThat(conf)
+                .containsEntry(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
+                .containsEntry(ProducerConfig.ACKS_CONFIG, "all")
+                .containsEntry(ProducerConfig.CLIENT_ID_CONFIG, "123")
+                .containsEntry(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
     }
 
     @Test
-    void consumerFactoryAvro_shouldReturnExpectedKafkaConfigs() {
-        // given
-        KafkaAvroProperties props = mock(KafkaAvroProperties.class);
-        var broker = new KafkaAvroProperties.Broker();
-        broker.setBootstrapServers("localhost:9092");
-        when(props.getBroker()).thenReturn(broker);
+    void producerFactory_shouldIncludeSSLConfigWhenEnabled() {
+        broker.getSsl().setEnabled(true);
+        broker.getSsl().setTrustStoreLocation("trust.jks");
+        broker.getSsl().setTrustStorePassword("pwd");
+        broker.getSsl().setKeyStoreLocation("keystore.jks");
+        broker.getSsl().setKeyStorePassword("kspwd");
+        broker.getSsl().setKeyPassword("keypwd");
 
-        var schemaRegistry = new KafkaAvroProperties.SchemaRegistry();
-        schemaRegistry.setUrl("http://mock-schema:8081");
-        when(props.getSchemaRegistry()).thenReturn(schemaRegistry);
+        schemaRegistry.getSsl().setEnabled(true);
+        schemaRegistry.getSsl().setTrustStoreLocation("t.jks");
+        schemaRegistry.getSsl().setTrustStorePassword("p");
+        schemaRegistry.getSsl().setKeyStoreLocation("ks.jks");
+        schemaRegistry.getSsl().setKeyStorePassword("kpwd");
+        schemaRegistry.getSsl().setKeyPassword("kkpwd");
 
-        // when
-        Map<String, Object> configs = config.consumerFactoryAvro(props);
+        ProducerFactory<String, Object> factory = config.producerFactory(props);
+        Map<String, Object> conf = ((DefaultKafkaProducerFactory<String, Object>) factory).getConfigurationProperties();
 
-        // then
-        assertThat(configs).isNotNull();
-        assertThat(configs)
+        assertThat(conf)
+                .containsEntry("security.protocol", "SSL")
+                .containsEntry(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, "trust.jks")
+                .containsEntry(SslConfigs.SSL_KEY_PASSWORD_CONFIG, "keypwd")
+                .containsEntry("schema.registry.ssl.truststore.location", "t.jks")
+                .containsEntry("schema.registry.ssl.key.password", "kkpwd");
+    }
+
+    // ----------------- TEST CONSOMMATEUR -----------------
+
+    @Test
+    void consumerFactoryAvro_shouldReturnDefaultKafkaConfig() {
+        Map<String, Object> map = config.consumerFactoryAvro(props);
+
+        assertThat(map)
                 .containsEntry(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
-                .containsEntry(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class)
-                .containsEntry(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class)
+                .containsEntry(ConsumerConfig.GROUP_ID_CONFIG, "test-group")
                 .containsEntry(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
     }
 
     @Test
+    void consumerFactoryAvro_shouldIncludeSSLWhenEnabled() {
+        broker.getSsl().setEnabled(true);
+        schemaRegistry.getSsl().setEnabled(true);
+
+        Map<String, Object> map = config.consumerFactoryAvro(props);
+        assertThat(map)
+                .containsEntry("security.protocol", "SSL")
+                .containsEntry("schema.registry.ssl.truststore.location",
+                        schemaRegistry.getSsl().getTrustStoreLocation());
+    }
+
+    @Test
     void consumerFactory_shouldReturnKafkaConsumerFactory() {
-        // given
-        KafkaAvroProperties props = mock(KafkaAvroProperties.class);
-        KafkaAvroAutoConfiguration spyConfig = spy(config);
-        Map<String, Object> mockMap = Map.of("key", "value");
-        doReturn(mockMap).when(spyConfig).consumerFactoryAvro(props);
-
-        // when
-        ConsumerFactory<String, Object> factory = spyConfig.consumerFactory(props);
-
-        // then
+        ConsumerFactory<String, Object> factory = config.consumerFactory(props);
         assertThat(factory).isInstanceOf(DefaultKafkaConsumerFactory.class);
     }
 
+    // ----------------- TEST TEMPLATE -----------------
+
     @Test
     void kafkaTemplate_shouldReturnKafkaTemplate() {
-        // given
         ProducerFactory<String, Object> producerFactory = mock(ProducerFactory.class);
+        KafkaTemplate<String, ?> template = config.kafkaTemplate(producerFactory);
 
-        // when
-        KafkaTemplate<String, Object> template = config.kafkaTemplate(producerFactory);
-
-        // then
         assertThat(template).isNotNull();
     }
 
+    // ----------------- TEST LISTENER FACTORY -----------------
+
     @Test
     void kafkaListenerContainerFactory_shouldReturnConfiguredFactory() {
-        // given
         ConsumerFactory<String, Object> consumerFactory = mock(ConsumerFactory.class);
-
-        // when
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 config.kafkaListenerContainerFactory(consumerFactory);
 
-        // then
         assertThat(factory).isNotNull();
         assertThat(factory.getContainerProperties().getAckMode().name()).isEqualTo("MANUAL");
     }
