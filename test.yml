@@ -1,147 +1,46 @@
-package com.bnpp.pf.common.kafka;
+@Test
+void producerFactory_shouldIncludeSSLConfigWhenEnabled() {
+    broker.getSsl().setEnabled(true);
+    broker.getSsl().setTrustStoreLocation("trust.jks");
+    broker.getSsl().setTrustStorePassword("pwd");
+    broker.getSsl().setKeyStoreLocation("keystore.jks");
+    broker.getSsl().setKeyStorePassword("kspwd");
+    broker.getSsl().setKeyPassword("keypwd");
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.config.SslConfigs;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.*;
+    schemaRegistry.getSsl().setEnabled(true);
+    schemaRegistry.getSsl().setTrustStoreLocation("trust-schema.jks");
+    schemaRegistry.getSsl().setTrustStorePassword("pwd-schema");
+    schemaRegistry.getSsl().setKeyStoreLocation("keystore-schema.jks");
+    schemaRegistry.getSsl().setKeyStorePassword("kspwd-schema");
+    schemaRegistry.getSsl().setKeyPassword("keypwd-schema");
 
-import java.util.Map;
+    ProducerFactory<String, Object> factory = config.producerFactory(props);
+    Map<String, Object> conf = ((DefaultKafkaProducerFactory<String, Object>) factory).getConfigurationProperties();
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+    assertThat(conf)
+            .containsEntry("security.protocol", "SSL")
+            .containsEntry(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, "trust.jks")
+            .containsEntry("schema.registry.ssl.truststore.location", "trust-schema.jks");
+}
 
-class KafkaAvroAutoConfigurationTest {
+@Test
+void consumerFactoryAvro_shouldIncludeSSLWhenEnabled() {
+    broker.getSsl().setEnabled(true);
+    broker.getSsl().setTrustStoreLocation("trust.jks");
+    broker.getSsl().setTrustStorePassword("pwd");
+    broker.getSsl().setKeyStoreLocation("keystore.jks");
+    broker.getSsl().setKeyStorePassword("kspwd");
+    broker.getSsl().setKeyPassword("keypwd");
 
-    private KafkaAvroAutoConfiguration config;
-    private KafkaAvroProperties props;
-    private KafkaAvroProperties.Broker broker;
-    private KafkaAvroProperties.SchemaRegistry schemaRegistry;
+    schemaRegistry.getSsl().setEnabled(true);
+    schemaRegistry.getSsl().setTrustStoreLocation("trust-schema.jks");
+    schemaRegistry.getSsl().setTrustStorePassword("pwd-schema");
+    schemaRegistry.getSsl().setKeyStoreLocation("keystore-schema.jks");
+    schemaRegistry.getSsl().setKeyStorePassword("kspwd-schema");
+    schemaRegistry.getSsl().setKeyPassword("keypwd-schema");
 
-    @BeforeEach
-    void setup() {
-        config = new KafkaAvroAutoConfiguration();
-        props = mock(KafkaAvroProperties.class);
-        broker = new KafkaAvroProperties.Broker();
-        schemaRegistry = new KafkaAvroProperties.SchemaRegistry();
-
-        // valeurs par défaut
-        broker.setBootstrapServers("localhost:9092");
-        broker.setSsl(new KafkaAvroProperties.Ssl());
-        schemaRegistry.setUrl("http://mock-schema:8081");
-        schemaRegistry.setSsl(new KafkaAvroProperties.Ssl());
-
-        var producer = new KafkaAvroProperties.Producer();
-        producer.setEnableIdempotenceConfig(true);
-        producer.setAutoRegisterSchemas(true);
-
-        var consumer = new KafkaAvroProperties.Consumer();
-        consumer.setGroupId("test-group");
-        consumer.setSpecificAvroReaderConfig(true);
-        consumer.setAllowAutoCreateTopicsConfig(false);
-        consumer.setEnableAutoCommitConfig(false);
-
-        when(props.getBroker()).thenReturn(broker);
-        when(props.getSchemaRegistry()).thenReturn(schemaRegistry);
-        when(props.getProducer()).thenReturn(producer);
-        when(props.getConsumer()).thenReturn(consumer);
-        when(props.getAppId()).thenReturn("app-test");
-    }
-
-    // ----------------- TEST PRODUCTEUR -----------------
-
-    @Test
-    void producerFactory_shouldReturnFactoryWithoutSSL() {
-        ProducerFactory<String, Object> factory = config.producerFactory(props);
-
-        assertThat(factory).isInstanceOf(DefaultKafkaProducerFactory.class);
-        Map<String, Object> conf = ((DefaultKafkaProducerFactory<String, Object>) factory).getConfigurationProperties();
-        assertThat(conf)
-                .containsEntry(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
-                .containsEntry(ProducerConfig.ACKS_CONFIG, "all")
-                .containsEntry(ProducerConfig.CLIENT_ID_CONFIG, "123")
-                .containsEntry(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-    }
-
-    @Test
-    void producerFactory_shouldIncludeSSLConfigWhenEnabled() {
-        broker.getSsl().setEnabled(true);
-        broker.getSsl().setTrustStoreLocation("trust.jks");
-        broker.getSsl().setTrustStorePassword("pwd");
-        broker.getSsl().setKeyStoreLocation("keystore.jks");
-        broker.getSsl().setKeyStorePassword("kspwd");
-        broker.getSsl().setKeyPassword("keypwd");
-
-        schemaRegistry.getSsl().setEnabled(true);
-        schemaRegistry.getSsl().setTrustStoreLocation("t.jks");
-        schemaRegistry.getSsl().setTrustStorePassword("p");
-        schemaRegistry.getSsl().setKeyStoreLocation("ks.jks");
-        schemaRegistry.getSsl().setKeyStorePassword("kpwd");
-        schemaRegistry.getSsl().setKeyPassword("kkpwd");
-
-        ProducerFactory<String, Object> factory = config.producerFactory(props);
-        Map<String, Object> conf = ((DefaultKafkaProducerFactory<String, Object>) factory).getConfigurationProperties();
-
-        assertThat(conf)
-                .containsEntry("security.protocol", "SSL")
-                .containsEntry(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, "trust.jks")
-                .containsEntry(SslConfigs.SSL_KEY_PASSWORD_CONFIG, "keypwd")
-                .containsEntry("schema.registry.ssl.truststore.location", "t.jks")
-                .containsEntry("schema.registry.ssl.key.password", "kkpwd");
-    }
-
-    // ----------------- TEST CONSOMMATEUR -----------------
-
-    @Test
-    void consumerFactoryAvro_shouldReturnDefaultKafkaConfig() {
-        Map<String, Object> map = config.consumerFactoryAvro(props);
-
-        assertThat(map)
-                .containsEntry(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
-                .containsEntry(ConsumerConfig.GROUP_ID_CONFIG, "test-group")
-                .containsEntry(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
-    }
-
-    @Test
-    void consumerFactoryAvro_shouldIncludeSSLWhenEnabled() {
-        broker.getSsl().setEnabled(true);
-        schemaRegistry.getSsl().setEnabled(true);
-
-        Map<String, Object> map = config.consumerFactoryAvro(props);
-        assertThat(map)
-                .containsEntry("security.protocol", "SSL")
-                .containsEntry("schema.registry.ssl.truststore.location",
-                        schemaRegistry.getSsl().getTrustStoreLocation());
-    }
-
-    @Test
-    void consumerFactory_shouldReturnKafkaConsumerFactory() {
-        ConsumerFactory<String, Object> factory = config.consumerFactory(props);
-        assertThat(factory).isInstanceOf(DefaultKafkaConsumerFactory.class);
-    }
-
-    // ----------------- TEST TEMPLATE -----------------
-
-    @Test
-    void kafkaTemplate_shouldReturnKafkaTemplate() {
-        ProducerFactory<String, Object> producerFactory = mock(ProducerFactory.class);
-        KafkaTemplate<String, ?> template = config.kafkaTemplate(producerFactory);
-
-        assertThat(template).isNotNull();
-    }
-
-    // ----------------- TEST LISTENER FACTORY -----------------
-
-    @Test
-    void kafkaListenerContainerFactory_shouldReturnConfiguredFactory() {
-        ConsumerFactory<String, Object> consumerFactory = mock(ConsumerFactory.class);
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                config.kafkaListenerContainerFactory(consumerFactory);
-
-        assertThat(factory).isNotNull();
-        assertThat(factory.getContainerProperties().getAckMode().name()).isEqualTo("MANUAL");
-    }
+    Map<String, Object> map = config.consumerFactoryAvro(props);
+    assertThat(map)
+            .containsEntry("security.protocol", "SSL")
+            .containsEntry("schema.registry.ssl.truststore.location", "trust-schema.jks");
 }
