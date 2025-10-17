@@ -1,14 +1,13 @@
-## 🎯 Purpose
+| Category | Description |
+|-----------|-------------|
+| **✅ Unified API Responses** | Automatically wraps all successful responses in a consistent JSON structure (`ApiResponse`). |
+| **❌ Centralized Error Handling** | Global `GlobalExceptionHandler` ensures uniform error payloads with codes, types, and trace IDs. |
+| **📖 OpenAPI (Swagger)** | Preconfigured with headers, error responses, and dynamic tagging for all REST controllers. |
+| **🗄️ PostgreSQL Auto-Config** | Centralized JPA and schema configuration, easily toggleable via properties. |
+| **📦 Kafka + Avro** | Ready-to-use producer/consumer setup with Confluent Schema Registry and SSL support. |
+| **☁️ IBM COS / S3 Storage** | Simplified integration for S3-compatible object storage services. |
+| **🔐 Vault Integration** | Full support for secret retrieval through Spring Cloud Vault. |
+| **🧾 MDC Logging** | Automatically enriches logs with contextual request metadata (userId, usecase, path, method). |
+| **📊 Observability Ready** | Integrated Micrometer, Logstash JSON encoding, and OpenTelemetry support. |
 
-Modern microservices often require consistent behavior across APIs—standardized responses, predictable error handling, and a uniform approach to configuration and observability.  
-The **API Response Starter** was built to solve exactly that.
-
-It acts as a **foundational internal starter** that:
-- Unifies **API response structures** and **error formats** across all backend services.
-- Reduces boilerplate by **auto-configuring common infrastructure layers** (DB, Kafka, Vault, Storage).
-- Enforces **organization-wide consistency** in API documentation, logging, and exception management.
-- Promotes **security and maintainability** through Vault-managed secrets and automatic property bindings.
-
-This library allows developers to focus on **business logic**, while infrastructure and best practices are applied automatically through Spring Boot’s autoconfiguration mechanism.
-
----
+--
