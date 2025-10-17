@@ -1,46 +1,277 @@
-@Test
-void producerFactory_shouldIncludeSSLConfigWhenEnabled() {
-    broker.getSsl().setEnabled(true);
-    broker.getSsl().setTrustStoreLocation("trust.jks");
-    broker.getSsl().setTrustStorePassword("pwd");
-    broker.getSsl().setKeyStoreLocation("keystore.jks");
-    broker.getSsl().setKeyStorePassword("kspwd");
-    broker.getSsl().setKeyPassword("keypwd");
+# 🚀 API Response Starter
 
-    schemaRegistry.getSsl().setEnabled(true);
-    schemaRegistry.getSsl().setTrustStoreLocation("trust-schema.jks");
-    schemaRegistry.getSsl().setTrustStorePassword("pwd-schema");
-    schemaRegistry.getSsl().setKeyStoreLocation("keystore-schema.jks");
-    schemaRegistry.getSsl().setKeyStorePassword("kspwd-schema");
-    schemaRegistry.getSsl().setKeyPassword("keypwd-schema");
+**API Response Starter** is a modular **Spring Boot library (JAR)** designed to be included as a dependency in other microservices.  
+It provides unified API response handling, error management, observability, and auto-configuration for PostgreSQL, Kafka (Avro), Vault, and S3-compatible storage.
 
-    ProducerFactory<String, Object> factory = config.producerFactory(props);
-    Map<String, Object> conf = ((DefaultKafkaProducerFactory<String, Object>) factory).getConfigurationProperties();
+---
 
-    assertThat(conf)
-            .containsEntry("security.protocol", "SSL")
-            .containsEntry(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, "trust.jks")
-            .containsEntry("schema.registry.ssl.truststore.location", "trust-schema.jks");
+## 🧱 Project Overview
+
+This project acts as an **internal Spring Boot Starter**, meaning it auto-configures common concerns when added as a dependency to other services.
+
+```
+com.lma.apiresponse
+├── api
+│   ├── annotation         → @NoWrap annotation to skip response wrapping
+│   ├── config             → Web / OpenAPI configuration
+│   ├── exception          → Global exception handling
+│   └── response           → Unified API response structure
+│
+├── datasource             → Common PostgreSQL properties & auto-config
+├── kafka                  → Kafka + Avro + Schema Registry configuration
+├── logging                → MDC filter for request context logging
+├── storage                → S3 storage (IBM COS compatible)
+└── vault                  → Vault auto-configuration switch
+```
+
+---
+
+## ⚙️ Technologies
+
+| Category | Stack |
+|-----------|--------|
+| **Framework** | Spring Boot 3.5.x |
+| **Language** | Java 21 |
+| **Documentation** | Springdoc OpenAPI 3 / Swagger UI |
+| **Database** | PostgreSQL + Spring Data JPA |
+| **Messaging** | Apache Kafka + Avro + Confluent Schema Registry |
+| **Storage** | IBM COS / S3 |
+| **Secrets** | Spring Cloud Vault |
+| **Logging** | Logback + MDC + Logstash JSON Encoder |
+| **Build Tool** | Maven |
+| **Packaging** | JAR (Starter dependency) |
+
+---
+
+## 🧩 Key Features
+
+### ✅ Unified API Responses
+
+All controller responses are automatically wrapped into a consistent structure:
+
+```json
+{
+  "type": "SUCCESS",
+  "status": 200,
+  "data": { ... },
+  "meta": {
+    "timestamp": "2025-10-17T12:34:56Z",
+    "requestId": "uuid-1234"
+  }
 }
+```
 
-@Test
-void consumerFactoryAvro_shouldIncludeSSLWhenEnabled() {
-    broker.getSsl().setEnabled(true);
-    broker.getSsl().setTrustStoreLocation("trust.jks");
-    broker.getSsl().setTrustStorePassword("pwd");
-    broker.getSsl().setKeyStoreLocation("keystore.jks");
-    broker.getSsl().setKeyStorePassword("kspwd");
-    broker.getSsl().setKeyPassword("keypwd");
+> Use `@NoWrap` on controllers or methods to return raw responses without wrapping.
 
-    schemaRegistry.getSsl().setEnabled(true);
-    schemaRegistry.getSsl().setTrustStoreLocation("trust-schema.jks");
-    schemaRegistry.getSsl().setTrustStorePassword("pwd-schema");
-    schemaRegistry.getSsl().setKeyStoreLocation("keystore-schema.jks");
-    schemaRegistry.getSsl().setKeyStorePassword("kspwd-schema");
-    schemaRegistry.getSsl().setKeyPassword("keypwd-schema");
+---
 
-    Map<String, Object> map = config.consumerFactoryAvro(props);
-    assertThat(map)
-            .containsEntry("security.protocol", "SSL")
-            .containsEntry("schema.registry.ssl.truststore.location", "trust-schema.jks");
+### ❌ Centralized Error Handling
+
+Exceptions extending `ApiException` are automatically handled by the global `GlobalExceptionHandler`.
+
+Example error payload:
+
+```json
+{
+  "type": "business_error",
+  "title": "Business rule violated",
+  "status": 422,
+  "instance": "/api/users",
+  "detail": "Insufficient balance",
+  "traceId": "d5d3c1a4-0c12-45df-bb6f-97f74e8cfb21",
+  "extensions": {
+    "code": "BIZ-003"
+  }
 }
+```
+
+---
+
+### 📖 OpenAPI (Swagger) Documentation
+
+Accessible automatically at:
+- **Swagger UI:** `/api/docs`
+- **OpenAPI Spec:** `/api/openapi`
+
+Features:
+- Common headers (`X-Correlation-Id`, `Accept-Language`)
+- Standardized error responses (400, 401, 403, 500)
+- Automatic tagging per controller
+
+---
+
+### 🗄️ PostgreSQL Configuration
+
+Auto-configured through:
+```yaml
+common:
+  postgres:
+    enabled: true
+    schema: my_schema
+    showSql: true
+```
+
+> Database credentials (URL, username, password) are managed via **Vault** — no hardcoded values required.
+
+---
+
+### ☁️ S3 Object Storage (IBM COS Compatible)
+
+Automatically configures a storage service for S3-compatible endpoints:
+
+```yaml
+common:
+  storage:
+    enabled: true
+    endpoint: https://s3.eu-de.cloud-object-storage.appdomain.cloud
+    region: eu-de
+    bucket: my-bucket
+```
+
+> Access keys and secrets are resolved via Vault.
+
+---
+
+### 📨 Kafka + Avro Support
+
+Auto-configures producers and consumers with Confluent Schema Registry support.
+
+```yaml
+common:
+  kafka:
+    enabled: true
+    groupId: my-app-group
+    appId: my-app
+    broker:
+      bootstrapServers: localhost:9092
+    schemaRegistry:
+      url: http://localhost:8081
+```
+
+> SSL configuration and sensitive credentials are automatically fetched from Vault.
+
+---
+
+### 🔐 Vault Integration
+
+This starter automatically activates Spring Cloud Vault support:
+
+```yaml
+common.vault.enabled: true
+spring.config.import: vault://
+```
+
+Any secret (database credentials, Kafka SSL, S3 access keys, etc.) is securely retrieved from Vault.
+
+---
+
+### 🧾 Logging Context Enrichment
+
+The `MdcEnricherFilter` automatically adds contextual data to logs for better traceability:
+
+- `userId`, `usecase`
+- `http.method`, `http.path`
+
+Example MDC-enriched log (JSON):
+```json
+{
+  "timestamp": "2025-10-17T12:34:56Z",
+  "level": "INFO",
+  "message": "Request processed successfully",
+  "userId": "user-123",
+  "usecase": "account-creation",
+  "http.method": "POST",
+  "http.path": "/api/accounts"
+}
+```
+
+---
+
+## 🧰 How to Use
+
+### Step 1 — Add Dependency
+
+In your target project’s `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>com.lma</groupId>
+    <artifactId>api-response</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+</dependency>
+```
+
+### Step 2 — Enable Configurations (if needed)
+
+Simply include the relevant property groups:
+
+```yaml
+common:
+  postgres:
+    enabled: true
+  kafka:
+    enabled: true
+  storage:
+    enabled: true
+  vault:
+    enabled: true
+```
+
+No manual setup required — the starter’s auto-configurations will activate automatically.
+
+---
+
+## 🧪 Testing Locally
+
+To build and test the starter:
+
+```bash
+mvn clean install
+```
+
+Then, include it in another project and start that application with:
+```bash
+mvn spring-boot:run
+```
+
+---
+
+## 📦 Build & Packaging
+
+| Property | Value |
+|-----------|--------|
+| **Packaging** | JAR |
+| **Java Version** | 21 |
+| **Build Tool** | Maven 3.9+ |
+| **Spring Boot** | 3.5.6 |
+| **Spring Cloud** | 2025.0.0 |
+
+### Useful Commands
+
+| Command | Description |
+|----------|-------------|
+| `mvn clean install` | Build and install the starter locally |
+| `mvn package` | Create a JAR for distribution |
+| `mvn test` | Run all tests |
+
+---
+
+## 🧠 Author & Maintenance
+
+**Author:** LMA Engineering  
+**Version:** 0.0.1-SNAPSHOT  
+**License:** Proprietary / Internal  
+**Contact:** team@lma.com
+
+---
+
+## 🧾 Roadmap
+
+- [ ] Provide sample microservice using this starter  
+- [ ] Add OpenTelemetry tracing auto-config  
+- [ ] Publish as internal Maven artifact (Nexus/Artifactory)  
+- [ ] Extend with optional Redis and Elasticsearch support  
+
+---
+
+> 💡 **Tip:** Use this project as a **Spring Boot Starter dependency** to enforce consistent API standards, error models, and infrastructure configurations across all internal microservices.
