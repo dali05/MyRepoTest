@@ -1,23 +1,12 @@
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
-import org.springframework.web.multipart.MultipartFile;
+package com.bnpp.pf.common.api.response;
 
-private File convertMultiPartToFile(MultipartFile file) throws IOException {
-    // Crée un répertoire temporaire sécurisé avec permissions restreintes
-    Path tempDir = Files.createTempDirectory("uploadDir-",
-            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+public class JsonConversionException extends RuntimeException {
 
-    // Crée un fichier temporaire dans ce répertoire sécurisé
-    Path tempFile = Files.createTempFile(tempDir, "upload-", ".tmp");
-
-    // Écrit le contenu du MultipartFile dans le fichier temporaire
-    try (OutputStream os = Files.newOutputStream(tempFile)) {
-        os.write(file.getBytes());
+    public JsonConversionException(String message, Throwable cause) {
+        super(message, cause);
     }
 
-    // Retourne le fichier temporaire
-    return tempFile.toFile();
+    public JsonConversionException(String message) {
+        super(message);
+    }
 }
