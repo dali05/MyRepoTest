@@ -1,12 +1,4 @@
-package com.bnpp.pf.common.api.response;
-
-public class JsonConversionException extends RuntimeException {
-
-    public JsonConversionException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public JsonConversionException(String message) {
-        super(message);
-    }
-}
+return !(
+    returnType.getContainingClass().isAnnotationPresent(Nowrap.class)
+    || returnType.hasMethodAnnotation(Nowrap.class)
+);
