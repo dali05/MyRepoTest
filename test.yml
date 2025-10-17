@@ -1,136 +1,19 @@
-## 🌟 Main Features
+## 🧪 Test Coverage Report
 
-### 🧱 Exception Management
+This project includes **JaCoCo** for measuring unit test coverage.
 
-- Centralized exception handling with custom exception classes (`ApiException`, `BusinessRuleException`, `NotFoundException`, etc.).  
-- Global `@RestControllerAdvice` intercepts and formats all error responses.  
-- Consistent error codes, messages, and HTTP statuses across services.  
-- Unified error payload structure using `ProblemPayload` (compliant with RFC 7807).  
-- Standard error categories: validation, business, not found, conflict, unauthorized, forbidden, internal.
+To generate a full coverage report, run:
 
----
-
-### ⚡ API Response Management
-
-- Generic response wrapper class (`ApiResponse<T>`) for consistent JSON responses.  
-- Built-in success response formats (`ok`, `created`) with metadata (`timestamp`, `requestId`, pagination, etc.).  
-- `@NoWrap` annotation to bypass wrapping for selected endpoints.  
-- Simplifies and standardizes API outputs for REST controllers.  
-- Ensures uniform client experience across services.
-
----
-
-### 📘 Swagger / OpenAPI Configuration
-
-- Preconfigured **Springdoc OpenAPI** and **Swagger UI** integration.  
-- Auto-generated API documentation with grouped endpoints (`/api/**`).  
-- Common headers (`X-Correlation-Id`, `Accept-Language`) automatically documented.  
-- Predefined error responses (`400`, `401`, `403`, `500`) applied globally.  
-- Customizable project metadata (`springdoc.title`, `springdoc.version`).  
-- Dynamic tagging: controllers automatically categorized by class name.
-
----
-
-### 🧩 PostgreSQL Configuration
-
-- Common JPA/Hibernate configuration via `DataSourceCommonAutoConfiguration`.  
-- Centralized property binding under `common.postgres.*`.  
-- Optional schema definition and SQL logging toggles.  
-- Default schema automatically applied to Hibernate.  
-- Seamless integration with Spring Data JPA.
-
-Example configuration:
-
-```yaml
-common:
-  postgres:
-    enabled: true
-    schema: my_schema
-    showSql: true
+```bash
+mvn clean install jacoco:report
 ```
 
-> Database credentials are retrieved securely through **Spring Cloud Vault**.
+After execution, open the generated report at:
 
----
-
-### 📨 Kafka + Avro Configuration
-
-- Ready-to-use Kafka Producer and Consumer factories.  
-- Avro serialization/deserialization using **Confluent Schema Registry**.  
-- Built-in SSL configuration for both broker and registry connections.  
-- Auto-configurable through `common.kafka.*` properties.  
-- Supports idempotent producers and manual consumer acknowledgment.  
-
-Example minimal configuration:
-
-```yaml
-common:
-  kafka:
-    enabled: true
-    groupId: my-group
-    appId: api-response
-    broker:
-      bootstrapServers: localhost:9092
-    schemaRegistry:
-      url: http://localhost:8081
+```
+target/site/jacoco/index.html
 ```
 
-> Sensitive properties (truststore, keystore, passwords) are stored and loaded from **Vault**.
-
----
-
-### ☁️ S3 / Object Storage Configuration
-
-- Native support for **IBM Cloud Object Storage** and any **S3-compatible service**.  
-- Upload, download, and list files via `StorageService`.  
-- Centralized configuration under `common.storage.*`.  
-- Auto-configured Amazon S3 client with region and endpoint.  
-- Built-in `S3StorageService` implementation.  
-
-Example:
-
-```yaml
-common:
-  storage:
-    enabled: true
-    endpoint: https://s3.eu-de.cloud-object-storage.appdomain.cloud
-    region: eu-de
-    bucket: my-bucket
-```
-
-> Access credentials are resolved automatically through **Vault**.
-
----
-
-### 🔐 Vault Integration
-
-- Automatic activation of Spring Cloud Vault if `common.vault.enabled=true`.  
-- Supports property-based secret injection using `spring.config.import=vault://`.  
-- Manages secrets for PostgreSQL, Kafka, and S3 storage.  
-- Centralized and secure configuration management across environments.
-
----
-
-### 🧾 Logging Configuration
-
-- Centralized **Logback** configuration with contextual logging (MDC).  
-- `MdcEnricherFilter` injects traceable metadata:  
-  - `userId`, `usecase`, `http.method`, `http.path`.  
-- JSON-formatted logs for integration with **ELK / Logstash** pipelines.  
-- Common logging configuration ready for microservice observability.
-
-Example log snippet:
-
-```json
-{
-  "timestamp": "2025-10-17T12:34:56Z",
-  "level": "INFO",
-  "message": "Request processed successfully",
-  "userId": "user-123",
-  "usecase": "account-creation",
-  "http.method": "POST",
-  "http.path": "/api/accounts"
-}
-```
+This report provides detailed line and branch coverage for all modules, helping maintain high test quality across auto-configurations, filters, and exception handling logic.
 
 ---
