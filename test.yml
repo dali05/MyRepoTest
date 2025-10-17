@@ -1,111 +1,23 @@
-# 🧾 Changelog — API Response Starter
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import org.springframework.web.multipart.MultipartFile;
 
-All notable changes to this project will be documented in this file.  
-This project follows the **Keep a Changelog** format and adheres to **Semantic Versioning (SemVer)**.
+private File convertMultiPartToFile(MultipartFile file) throws IOException {
+    // Crée un répertoire temporaire sécurisé avec permissions restreintes
+    Path tempDir = Files.createTempDirectory("uploadDir-",
+            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
 
----
+    // Crée un fichier temporaire dans ce répertoire sécurisé
+    Path tempFile = Files.createTempFile(tempDir, "upload-", ".tmp");
 
-## [0.0.1] — 2025-10-17
-### 🎉 Initial Release
+    // Écrit le contenu du MultipartFile dans le fichier temporaire
+    try (OutputStream os = Files.newOutputStream(tempFile)) {
+        os.write(file.getBytes());
+    }
 
-The **first release** of **API Response Starter**, a modular and reusable Spring Boot library designed for consistent API behavior, unified error handling, and infrastructure auto-configuration.
-
-#### 🧱 Core Features
-
-- **Unified API Response Model**
-  - Automatic wrapping of all successful API responses into a standardized structure.
-  - `@NoWrap` annotation to bypass wrapping for specific endpoints.
-
-- **Global Exception Handling**
-  - Centralized error management with consistent JSON error payloads.
-  - Includes `ApiException`, `BusinessRuleException`, and `NotFoundException`.
-  - Custom error codes (`BIZ-001`, `RES-404`, etc.) following a business-oriented catalog.
-
-- **OpenAPI / Swagger Documentation**
-  - Auto-generated documentation with global headers and common error codes.
-  - Configurable via `springdoc` properties.
-  - Ready-to-use Swagger UI (`/api/docs`) and OpenAPI spec (`/api/openapi`).
-
-- **Common PostgreSQL Configuration**
-  - Auto-configuration for Spring Data JPA and Hibernate schema.
-  - Toggleable via `common.postgres.enabled` and `common.postgres.showSql`.
-  - Schema name management through `common.postgres.schema`.
-
-- **Kafka + Avro Integration**
-  - Built-in producer/consumer factories using Confluent Avro serializers.
-  - Integrated Schema Registry configuration with optional SSL.
-  - Supports idempotent producers and secure message deserialization.
-
-- **IBM COS / S3 Storage Support**
-  - Simplified abstraction for uploading, downloading, and listing files.
-  - Fully integrated with IBM Cloud Object Storage (S3-compatible).
-  - Configuration through `common.storage.*` properties.
-
-- **Spring Cloud Vault Integration**
-  - Automatic activation of `spring.config.import=vault://` when enabled.
-  - Secrets (DB, Kafka, S3) are retrieved securely from Vault.
-  - Reduces manual configuration of credentials and keys.
-
-- **Logging Context (MDC)**
-  - Automatic enrichment of logs with contextual data:
-    - `userId`, `usecase`, `http.method`, `http.path`
-  - Fully compatible with JSON logging and Logstash pipelines.
-
-#### ⚙️ Technical Enhancements
-
-- Java 21 baseline
-- Spring Boot 3.5.6 compatibility
-- Spring Cloud 2025.0.0 integration
-- Maven build with annotation processing (Lombok, MapStruct)
-- WAR packaging switched to **JAR** for library usage
-- Tested for Tomcat and embedded Spring Boot environments
-
-#### 🧩 Provided Auto-Configuration Modules
-
-| Module | Description |
-|---------|--------------|
-| `DataSourceCommonAutoConfiguration` | Shared PostgreSQL setup |
-| `KafkaAvroAutoConfiguration` | Kafka + Avro + Schema Registry |
-| `S3StorageAutoConfiguration` | S3-compatible object storage |
-| `VaultAutoConfiguration` | Vault activation switch |
-| `CommonApiAutoConfiguration` | Core API response and body advice |
-
-#### 🧪 Quality & Testing
-
-- JUnit 5 base test setup via `spring-boot-starter-test`
-- Maven Surefire integration for build validation
-- Verified with local PostgreSQL and Kafka environments
-
-#### 📚 Documentation
-
-- `README.md` for project overview and usage as a dependency.
-- Swagger integration for runtime API documentation.
-- Built-in annotations and comments for developer clarity.
-
----
-
-## 🔮 Future Plans
-
-- Add OpenTelemetry tracing integration.
-- Introduce a demo microservice using the starter.
-- Publish artifact to internal Maven repository (Nexus / Artifactory).
-- Add Redis and Elasticsearch optional modules.
-- Enhance Vault integration for dynamic credentials rotation.
-
----
-
-## 📅 Release Metadata
-
-| Field | Value |
-|-------|--------|
-| **Version** | 0.0.1 |
-| **Release Date** | 2025-10-17 |
-| **Packaging** | JAR |
-| **Java Version** | 21 |
-| **Spring Boot** | 3.5.6 |
-| **Maintainer** | LMA Engineering |
-| **License** | Proprietary / Internal |
-
----
-
-> 💡
+    // Retourne le fichier temporaire
+    return tempFile.toFile();
+}
