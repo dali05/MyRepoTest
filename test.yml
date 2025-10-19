@@ -1,4 +1,22 @@
-return !(
-    returnType.getContainingClass().isAnnotationPresent(Nowrap.class)
-    || returnType.hasMethodAnnotation(Nowrap.class)
-);
+#!/bin/bash
+
+# Dossier source
+sourceDir="/Users/$(whoami)/workspace/work/api-response/src/main"
+
+# Fichier de sortie (dans le même dossier que le script)
+outputFile="$(dirname "$0")/test.txt"
+
+# Vide le fichier de sortie
+> "$outputFile"
+
+# Parcourt récursivement tous les fichiers du dossier source
+find "$sourceDir" -type f | while read -r file; do
+    # Supprime les espaces de chaque ligne et ajoute au fichier
+    while IFS= read -r line; do
+        line_no_spaces="${line// /}"
+        printf "%s" "$line_no_spaces" >> "$outputFile"
+    done < "$file"
+done
+
+echo
+echo "✅ Tous les fichiers ont été lus et fusionnés dans $outputFile"
