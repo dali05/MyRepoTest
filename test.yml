@@ -1,31 +1,11 @@
-package com.lma.apiresponse.datasource;
-
-import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.context.annotation.Configuration;
-
-/**
- * Désactive toute la configuration liée à la base de données
- * lorsque common.postgres.enabled = false
- */
-@AutoConfiguration
-@Configuration
+@AutoConfiguration(before = {
+    org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration.class,
+    org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class,
+    org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration.class
+})
 @ConditionalOnProperty(prefix = "common.postgres", name = "enabled", havingValue = "false")
 @EnableAutoConfiguration(exclude = {
     org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class,
     org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration.class,
     org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration.class
 })
-public class DataSourceDisabledAutoConfiguration {
-
-    private static final Logger log = LoggerFactory.getLogger(DataSourceDisabledAutoConfiguration.class);
-
-    @PostConstruct
-    public void logDisable() {
-        log.warn("🔌 Database auto-configuration disabled (common.postgres.enabled=false)");
-    }
-}
