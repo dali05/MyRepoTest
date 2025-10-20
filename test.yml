@@ -1,22 +1,92 @@
-#!/bin/bash
+package com.lma.apiresponse.datasource;
 
-# Dossier source
-sourceDir="/Users/$(whoami)/workspace/work/api-response/src/main"
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-# Fichier de sortie (dans le même dossier que le script)
-outputFile="$(dirname "$0")/test.txt"
+@Data
+@ConfigurationProperties(prefix = "common.postgres")
+public class DataSourceCommonProperties {
 
-# Vide le fichier de sortie
-> "$outputFile"
+    /** Active ou désactive la configuration commune PostgresSQL. */
+    private boolean enabled = true;
 
-# Parcourt récursivement tous les fichiers du dossier source
-find "$sourceDir" -type f | while read -r file; do
-    # Supprime les espaces de chaque ligne et ajoute au fichier
-    while IFS= read -r line; do
-        line_no_spaces="${line// /}"
-        printf "%s" "$line_no_spaces" >> "$outputFile"
-    done < "$file"
-done
+    /** Nom du schéma par défaut (optionnel). */
+    private String schema;
 
-echo
-echo "✅ Tous les fichiers ont été lus et fusionnés dans $outputFile"
+    /** Affiche les requêtes SQL (optionnel). */
+    private boolean showSql = false;
+
+    /** URL JDBC */
+    private String url;
+
+    /** Nom d'utilisateur */
+    private String username;
+
+    /** Mot de passe */
+    private String password;
+
+    /** Driver JDBC */
+    private String driverClassName = "org.postgresql.Driver";
+
+    /** Stratégie de nommage Hibernate (optionnelle) */
+    private String namingStrategy = "org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl";
+
+    /** Dialecte Hibernate */
+    private String dialect = "org.hibernate.dialect.PostgreSQLDialect";
+
+    /** Mode ddl-auto (create, update, validate, none) */
+    private String ddlAuto = "none";
+}
+
+
+package com.lma.apiresponse.datasource;
+
+import jakarta.annotation.PostConstruct;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
+@AutoConfiguration
+@EnableConfigurationProperties(DataSourceCommonProperties.class)
+@ConditionalOnProperty(prefix = "common.postgres", name = "enabled", havingValue = "true", matchIfMissing = true)
+public class DataSourceCommonAutoConfiguration {
+
+    private final DataSourceCommonProperties props;
+
+    public DataSourceCommonAutoConfiguration(DataSourceCommonProperties props) {
+        this.props = props;
+    }
+
+    @PostConstruct
+    public void applyCommonSettings() {
+
+        // === DataSource ===
+        if (props.getUrl() != null) {
+            System.setProperty("spring.datasource.url", props.getUrl());
+        }
+        if (props.getUsername() != null) {
+            System.setProperty("spring.datasource.username", props.getUsername());
+        }
+        if (props.getPassword() != null) {
+            System.setProperty("spring.datasource.password", props.getPassword());
+        }
+        if (props.getDriverClassName() != null) {
+            System.setProperty("spring.datasource.driver-class-name", props.getDriverClassName());
+        }
+
+        // === JPA ===
+        System.setProperty("spring.jpa.hibernate.ddl-auto", props.getDdlAuto());
+        System.setProperty("spring.jpa.hibernate.naming.physical-strategy", props.getNamingStrategy());
+        System.setProperty("spring.jpa.properties.hibernate.globally_quoted_identifiers", "true");
+        System.setProperty("spring.jpa.properties.hibernate.dialect", props.getDialect());
+
+        if (props.getSchema() != null) {
+            System.setProperty("spring.jpa.properties.hibernate.default_schema", props.getSchema());
+        }
+
+        if (props.isShowSql()) {
+            System.setProperty("spring.jpa.show-sql", "true");
+            System.setProperty("spring.jpa.properties.hibernate.show_sql", "true");
+        }
+    }
+}
