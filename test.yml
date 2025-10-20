@@ -1,6 +1,27 @@
-spring:
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+package com.bnpp.pf.common.datasource;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.env.EnvironmentPostProcessor;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.MapPropertySource;
+
+import java.util.Map;
+
+public class DataSourceDisabledEnvironmentPostProcessor implements EnvironmentPostProcessor {
+
+    @Override
+    public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
+        boolean disabled = "false".equals(environment.getProperty("common.datasource.enabled", "true"));
+
+        if (disabled) {
+            Map<String, Object> props = Map.of(
+                    "spring.autoconfigure.exclude", String.join(",",
+                            "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
+                            "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration",
+                            "org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration"
+                    )
+            );
+            environment.getPropertySources().addFirst(new MapPropertySource("disableDatasource", props));
+        }
+    }
+}
