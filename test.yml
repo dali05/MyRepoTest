@@ -1,19 +1,6 @@
-package com.lma.apiresponse.datasource;
-
-import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Configuration;
-
-@AutoConfiguration
-@Configuration
-@ConditionalOnProperty(prefix = "common.postgres", name = "enabled", havingValue = "false")
-public class DataSourceDisabledAutoConfiguration {
-
-    static {
-        // Désactive complètement la config datasource et JPA
-        System.setProperty("spring.autoconfigure.exclude",
-                "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration," +
-                "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration");
-    }
-
-}
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
