@@ -1,17 +1,14 @@
-@Converter
-public class StringListConverter implements AttributeConverter<List<String>, String> {
+Développeur Full Stack Java JEE confirmé, j’interviens depuis plus de 7 ans sur des projets complexes en environnement microservices et architectures modernes. Mon expertise couvre à la fois le développement back-end (Spring Boot, Java, Kafka, Keycloak) et front-end (Angular 18). Ayant travaillé sur des projets d’envergure tels que Malakoff Humanis et Banque de France, je maîtrise les bonnes pratiques agiles et la qualité logicielle (CI/CD, TDD, Clean Code). Mon objectif est d’apporter une solution fiable, performante et évolutive répondant aux besoins du client.
 
-    private static final String SEPARATOR = ",";
+⸻
 
-    @Override
-    public String convertToDatabaseColumn(List<String> list) {
-        if (list == null || list.isEmpty()) return "";
-        return String.join(SEPARATOR, list);
-    }
-
-    @Override
-    public List<String> convertToEntityAttribute(String joined) {
-        if (joined == null || joined.isBlank()) return List.of();
-        return Arrays.asList(joined.split(SEPARATOR));
-    }
-}
+2. Compétences clés
+	•	Environnement technique
+Java 8 à 18, Spring Boot, Spring Security, Hibernate, Angular (5 à 18), Kafka, Docker, Kubernetes, Jenkins, Keycloak, REST, SOAP, GraphQL, AWS, MinIO, PostgreSQL, Oracle, MySQL, Git, Jira.
+	•	Compétences métiers
+Conception et développement d’applications web, architecture microservices, sécurité applicative (OAuth2, Keycloak), intégration continue, optimisation des performances, rédaction des user stories, pilotage en méthode Scrum.
+	•	Langues
+Français : courant
+Anglais : intermédiaire
+	•	Savoir-être
+Autonome, rigoureux, bon esprit d’équipe, orienté solution, force de proposition, habitué à travailler en mode agile (Scrum).
