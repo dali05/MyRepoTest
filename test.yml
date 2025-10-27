@@ -1,34 +1,19 @@
-import React, { useState } from "react";
-import { IconButton } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import ConfirmDialog from "./ConfirmDialog"; // le composant créé ci-dessus
+const [openConfirm, setOpenConfirm] = useState(false);
+const [selectedReq, setSelectedReq] = useState<UseCaseWithNotif | null>(null);
 
-function YourComponent({ req, handleDeleteButton }) {
-  const [openConfirm, setOpenConfirm] = useState(false);
+const handleOpenConfirm = (req: UseCaseWithNotif) => {
+  setSelectedReq(req);
+  setOpenConfirm(true);
+};
 
-  const handleOpenConfirm = () => setOpenConfirm(true);
-  const handleCloseConfirm = () => setOpenConfirm(false);
+const handleCloseConfirm = () => {
+  setOpenConfirm(false);
+  setSelectedReq(null);
+};
 
-  const handleConfirmDelete = () => {
-    handleDeleteButton(req);
-    setOpenConfirm(false);
-  };
-
-  return (
-    <>
-      <IconButton onClick={handleOpenConfirm}>
-        <DeleteIcon fontSize="small" />
-      </IconButton>
-
-      <ConfirmDialog
-        open={openConfirm}
-        title="Confirmer la suppression"
-        message={`Voulez-vous vraiment supprimer le case : ${req.caseName} ?`}
-        onClose={handleCloseConfirm}
-        onConfirm={handleConfirmDelete}
-      />
-    </>
-  );
-}
-
-export default YourComponent;
+const handleConfirmDelete = () => {
+  if (selectedReq) {
+    handleDeleteButton(selectedReq);
+  }
+  handleCloseConfirm();
+};
