@@ -1,19 +1,12 @@
-const [openConfirm, setOpenConfirm] = useState(false);
-const [selectedReq, setSelectedReq] = useState<UseCaseWithNotif | null>(null);
-
-const handleOpenConfirm = (req: UseCaseWithNotif) => {
-  setSelectedReq(req);
-  setOpenConfirm(true);
-};
-
-const handleCloseConfirm = () => {
-  setOpenConfirm(false);
-  setSelectedReq(null);
-};
-
-const handleConfirmDelete = () => {
-  if (selectedReq) {
-    handleDeleteButton(selectedReq);
-  }
-  handleCloseConfirm();
-};
+<Dialog
+  open={openConfirm}
+  onClose={handleCloseConfirm}
+  sx={{
+    '& .MuiDialog-container': {
+      alignItems: 'flex-start',
+    },
+  }}
+  PaperProps={{
+    sx: { mt: 6, borderRadius: 2 },
+  }}
+>
