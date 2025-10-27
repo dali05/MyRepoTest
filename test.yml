@@ -1,44 +1,23 @@
-import React from "react";
-import {
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Button,
-} from "@mui/material";
+return (
+    <>
+      <IconButton>
+        <EditIcon fontSize="small" />
+      </IconButton>
 
-// ✅ Définition des types des props
-interface ConfirmDialogProps {
-  open: boolean;
-  title: string;
-  message: string | React.ReactNode;
-  onClose: () => void;
-  onConfirm: () => void;
-}
+      <IconButton onClick={handleOpenConfirm}>
+        <DeleteIcon fontSize="small" />
+      </IconButton>
 
-// ✅ Utilisation du type dans la fonction
-export default function ConfirmDialog({
-  open,
-  title,
-  message,
-  onClose,
-  onConfirm,
-}: ConfirmDialogProps) {
-  return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>{title}</DialogTitle>
-      <DialogContent>
-        <DialogContentText>{message}</DialogContentText>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="inherit">
-          Annuler
-        </Button>
-        <Button onClick={onConfirm} color="error" autoFocus>
-          Supprimer
-        </Button>
-      </DialogActions>
-    </Dialog>
+      {/* 🔔 Composant ConfirmDialog réutilisable */}
+      <ConfirmDialog
+        open={openConfirm}
+        title="Confirmer la suppression"
+        message={`Voulez-vous vraiment supprimer le case : ${req.caseName} ?`}
+        onClose={handleCloseConfirm}
+        onConfirm={handleConfirmDelete}
+      />
+    </>
   );
 }
+
+export default CaseRow;
