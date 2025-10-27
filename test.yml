@@ -1,14 +1,25 @@
-return (
-    <>
-      <IconButton>
-        <EditIcon fontSize="small" />
-      </IconButton>
+import React, { useState } from "react";
+import { IconButton } from "@mui/material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ConfirmDialog from "./ConfirmDialog"; // le composant créé ci-dessus
 
+function YourComponent({ req, handleDeleteButton }) {
+  const [openConfirm, setOpenConfirm] = useState(false);
+
+  const handleOpenConfirm = () => setOpenConfirm(true);
+  const handleCloseConfirm = () => setOpenConfirm(false);
+
+  const handleConfirmDelete = () => {
+    handleDeleteButton(req);
+    setOpenConfirm(false);
+  };
+
+  return (
+    <>
       <IconButton onClick={handleOpenConfirm}>
         <DeleteIcon fontSize="small" />
       </IconButton>
 
-      {/* 🔔 Composant ConfirmDialog réutilisable */}
       <ConfirmDialog
         open={openConfirm}
         title="Confirmer la suppression"
@@ -20,4 +31,4 @@ return (
   );
 }
 
-export default CaseRow;
+export default YourComponent;
