@@ -1,12 +1,243 @@
-<Dialog
-  open={openConfirm}
-  onClose={handleCloseConfirm}
-  sx={{
-    '& .MuiDialog-container': {
-      alignItems: 'flex-start',
-    },
-  }}
-  PaperProps={{
-    sx: { mt: 6, borderRadius: 2 },
-  }}
->
+package com.bnpp.pf.walle.admin.service;
+
+import com.bnpp.pf.walle.admin.domain.CaseEntity;
+import com.bnpp.pf.walle.admin.dto.CaseRequestDto;
+import com.bnpp.pf.walle.admin.dto.CaseResponseDto;
+import com.bnpp.pf.walle.admin.exception.AlreadyExistException;
+import com.bnpp.pf.walle.admin.exception.NotFoundException;
+import com.bnpp.pf.walle.admin.mapper.CaseMapper;
+import com.bnpp.pf.walle.admin.repository.CaseRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import java.util.Collections;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CaseServiceImplTest {
+
+    @Mock
+    private CaseRepository repository;
+
+    @Mock
+    private CaseMapper mapper;
+
+    @InjectMocks
+    private CaseServiceImpl service;
+
+    private CaseRequestDto requestDto;
+    private CaseEntity entity;
+    private CaseResponseDto responseDto;
+
+    @BeforeEach
+    void setUp() {
+        requestDto = new CaseRequestDto();
+        requestDto.setCaseName("TestCase");
+
+        entity = new CaseEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setCaseName("TestCase");
+
+        responseDto = new CaseResponseDto();
+        responseDto.setId(entity.getId());
+        responseDto.setCaseName(entity.getCaseName());
+    }
+
+    @Test
+    void testCreateCase_Success() {
+        when(mapper.toEntity(requestDto)).thenReturn(entity);
+        when(repository.save(entity)).thenReturn(entity);
+        when(mapper.toDto(entity)).thenReturn(responseDto);
+
+        CaseResponseDto result = service.createCase(requestDto);
+
+        assertNotNull(result);
+        assertEquals("TestCase", result.getCaseName());
+        verify(repository).save(entity);
+    }
+
+    @Test
+    void testCreateCase_AlreadyExists() {
+        when(mapper.toEntity(requestDto)).thenReturn(entity);
+        when(repository.save(entity)).thenThrow(DataIntegrityViolationException.class);
+
+        assertThrows(AlreadyExistException.class, () -> service.createCase(requestDto));
+    }
+
+    @Test
+    void testGetAllCases() {
+        when(repository.findAll()).thenReturn(Collections.singletonList(entity));
+        when(mapper.toDto(entity)).thenReturn(responseDto);
+
+        var list = service.getAllCases();
+
+        assertEquals(1, list.size());
+        assertEquals("TestCase", list.get(0).getCaseName());
+    }
+
+    @Test
+    void testGetCaseById_Found() {
+        when(repository.findById(entity.getId())).thenReturn(Optional.of(entity));
+        when(mapper.toDto(entity)).thenReturn(responseDto);
+
+        CaseResponseDto result = service.getCaseById(entity.getId());
+
+        assertNotNull(result);
+        assertEquals("TestCase", result.getCaseName());
+    }
+
+    @Test
+    void testGetCaseById_NotFound() {
+        when(repository.findById(any(UUID.class))).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> service.getCaseById(UUID.randomUUID()));
+    }
+
+    @Test
+    void testUpdateCase_Success() {
+        when(repository.findById(entity.getId())).thenReturn(Optional.of(entity));
+        when(mapper.toEntity(requestDto)).thenReturn(entity);
+        when(repository.save(entity)).thenReturn(entity);
+        when(mapper.toDto(entity)).thenReturn(responseDto);
+
+        CaseResponseDto result = service.updateCase(entity.getId(), requestDto);
+
+        assertNotNull(result);
+        assertEquals("TestCase", result.getCaseName());
+        verify(repository).save(entity);
+    }
+
+    @Test
+    void testUpdateCase_AlreadyExists() {
+        when(repository.findById(entity.getId())).thenReturn(Optional.of(entity));
+        when(mapper.toEntity(requestDto)).thenReturn(entity);
+        when(repository.save(entity)).thenThrow(DataIntegrityViolationException.class);
+
+        assertThrows(AlreadyExistException.class, () -> service.updateCase(entity.getId(), requestDto));
+    }
+
+    @Test
+    void testDeleteCase_Success() {
+        when(repository.existsById(entity.getId())).thenReturn(true);
+
+        service.deleteCase(entity.getId());
+
+        verify(repository).deleteById(entity.getId());
+    }
+
+    @Test
+    void testDeleteCase_NotFound() {
+        when(repository.existsById(entity.getId())).thenReturn(false);
+
+        assertThrows(NotFoundException.class, () -> service.deleteCase(entity.getId()));
+    }
+}
+
+package com.bnpp.pf.walle.admin.web.controller;
+
+import com.bnpp.pf.walle.admin.dto.CaseRequestDto;
+import com.bnpp.pf.walle.admin.dto.CaseResponseDto;
+import com.bnpp.pf.walle.admin.service.CaseService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(CaseController.class)
+class CaseControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private CaseService service;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private CaseRequestDto requestDto;
+    private CaseResponseDto responseDto;
+    private UUID id;
+
+    @BeforeEach
+    void setUp() {
+        id = UUID.randomUUID();
+        requestDto = new CaseRequestDto();
+        requestDto.setCaseName("TestCase");
+
+        responseDto = new CaseResponseDto();
+        responseDto.setId(id);
+        responseDto.setCaseName("TestCase");
+    }
+
+    @Test
+    void testCreateCase() throws Exception {
+        Mockito.when(service.createCase(any())).thenReturn(responseDto);
+
+        mockMvc.perform(post("/cases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.caseName").value("TestCase"));
+    }
+
+    @Test
+    void testGetAllCases() throws Exception {
+        Mockito.when(service.getAllCases()).thenReturn(List.of(responseDto));
+
+        mockMvc.perform(get("/cases"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].caseName").value("TestCase"));
+    }
+
+    @Test
+    void testGetCaseById() throws Exception {
+        Mockito.when(service.getCaseById(eq(id))).thenReturn(responseDto);
+
+        mockMvc.perform(get("/cases/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseName").value("TestCase"));
+    }
+
+    @Test
+    void testUpdateCase() throws Exception {
+        Mockito.when(service.updateCase(eq(id), any())).thenReturn(responseDto);
+
+        mockMvc.perform(put("/cases/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseName").value("TestCase"));
+    }
+
+    @Test
+    void testDeleteCase() throws Exception {
+        mockMvc.perform(delete("/cases/{id}", id))
+                .andExpect(status().isNoContent());
+
+        Mockito.verify(service).deleteCase(id);
+    }
+}
