@@ -1,19 +1,18 @@
 package com.bnpp.pf.walle.admin.service;
 
-import com.bnpp.pf.walle.admin.domain.CaseEntity;
-import com.bnpp.pf.walle.admin.dto.CaseRequestDto;
-import com.bnpp.pf.walle.admin.dto.CaseResponseDto;
-import com.bnpp.pf.walle.admin.exception.AlreadyExistException;
+import com.bnpp.pf.walle.admin.domain.ConfigEntity;
+import com.bnpp.pf.walle.admin.dto.ConfigRequestDto;
+import com.bnpp.pf.walle.admin.dto.ConfigResponseDto;
+import com.bnpp.pf.walle.admin.enums.NotificationType;
 import com.bnpp.pf.walle.admin.exception.NotFoundException;
-import com.bnpp.pf.walle.admin.mapper.CaseMapper;
-import com.bnpp.pf.walle.admin.repository.CaseRepository;
+import com.bnpp.pf.walle.admin.mapper.ConfigMapper;
+import com.bnpp.pf.walle.admin.repository.ConfigRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Collections;
 import java.util.Optional;
@@ -24,130 +23,128 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class CaseServiceImplTest {
+class ConfigServiceImplTest {
 
     @Mock
-    private CaseRepository repository;
-
+    private ConfigRepository repository;
     @Mock
-    private CaseMapper mapper;
-
+    private ConfigMapper mapper;
+    @Mock
+    private CaseRepository caseRepository;
     @InjectMocks
-    private CaseServiceImpl service;
+    private ConfigServiceImpl service;
 
-    private CaseRequestDto requestDto;
-    private CaseEntity entity;
-    private CaseResponseDto responseDto;
+    private ConfigRequestDto requestDto;
+    private ConfigEntity entity;
+    private ConfigResponseDto responseDto;
+    private UUID id;
 
     @BeforeEach
     void setUp() {
-        requestDto = new CaseRequestDto();
-        requestDto.setCaseName("TestCase");
+        id = UUID.randomUUID();
+        requestDto = new ConfigRequestDto();
+        requestDto.setCaseId(id);
+        requestDto.setNotification(NotificationType.KAFKA);
+        requestDto.setTopicUrl("topic-test");
+        requestDto.setAlgorithm("ES256");
 
-        entity = new CaseEntity();
-        entity.setId(UUID.randomUUID());
-        entity.setCaseName("TestCase");
+        entity = new ConfigEntity();
+        entity.setId(id);
 
-        responseDto = new CaseResponseDto();
-        responseDto.setId(entity.getId());
-        responseDto.setCaseName(entity.getCaseName());
+        responseDto = new ConfigResponseDto();
+        responseDto.setId(id);
     }
 
     @Test
-    void testCreateCase_Success() {
+    void testCreateConfig_Success() {
+        when(caseRepository.findById(requestDto.getCaseId())).thenReturn(Optional.of(new CaseEntity()));
         when(mapper.toEntity(requestDto)).thenReturn(entity);
         when(repository.save(entity)).thenReturn(entity);
         when(mapper.toDto(entity)).thenReturn(responseDto);
 
-        CaseResponseDto result = service.createCase(requestDto);
+        ConfigResponseDto result = service.createConfig(requestDto);
 
         assertNotNull(result);
-        assertEquals("TestCase", result.getCaseName());
+        assertEquals(id, result.getId());
         verify(repository).save(entity);
     }
 
     @Test
-    void testCreateCase_AlreadyExists() {
-        when(mapper.toEntity(requestDto)).thenReturn(entity);
-        when(repository.save(entity)).thenThrow(DataIntegrityViolationException.class);
-
-        assertThrows(AlreadyExistException.class, () -> service.createCase(requestDto));
+    void testCreateConfig_CaseNotFound() {
+        when(caseRepository.findById(requestDto.getCaseId())).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.createConfig(requestDto));
     }
 
     @Test
-    void testGetAllCases() {
+    void testGetAllConfigs() {
         when(repository.findAll()).thenReturn(Collections.singletonList(entity));
         when(mapper.toDto(entity)).thenReturn(responseDto);
 
-        var list = service.getAllCases();
-
-        assertEquals(1, list.size());
-        assertEquals("TestCase", list.get(0).getCaseName());
+        var result = service.getAllConfigs();
+        assertEquals(1, result.size());
+        verify(repository).findAll();
     }
 
     @Test
-    void testGetCaseById_Found() {
-        when(repository.findById(entity.getId())).thenReturn(Optional.of(entity));
+    void testGetConfigById_Found() {
+        when(repository.findById(id)).thenReturn(Optional.of(entity));
         when(mapper.toDto(entity)).thenReturn(responseDto);
 
-        CaseResponseDto result = service.getCaseById(entity.getId());
-
-        assertNotNull(result);
-        assertEquals("TestCase", result.getCaseName());
+        var result = service.getConfigById(id);
+        assertEquals(id, result.getId());
     }
 
     @Test
-    void testGetCaseById_NotFound() {
-        when(repository.findById(any(UUID.class))).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class, () -> service.getCaseById(UUID.randomUUID()));
+    void testGetConfigById_NotFound() {
+        when(repository.findById(id)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.getConfigById(id));
     }
 
     @Test
-    void testUpdateCase_Success() {
-        when(repository.findById(entity.getId())).thenReturn(Optional.of(entity));
+    void testUpdateConfig_Success() {
+        when(repository.findById(id)).thenReturn(Optional.of(entity));
         when(mapper.toEntity(requestDto)).thenReturn(entity);
         when(repository.save(entity)).thenReturn(entity);
         when(mapper.toDto(entity)).thenReturn(responseDto);
 
-        CaseResponseDto result = service.updateCase(entity.getId(), requestDto);
-
+        ConfigResponseDto result = service.updateConfig(id, requestDto);
         assertNotNull(result);
-        assertEquals("TestCase", result.getCaseName());
         verify(repository).save(entity);
     }
 
     @Test
-    void testUpdateCase_AlreadyExists() {
-        when(repository.findById(entity.getId())).thenReturn(Optional.of(entity));
-        when(mapper.toEntity(requestDto)).thenReturn(entity);
-        when(repository.save(entity)).thenThrow(DataIntegrityViolationException.class);
-
-        assertThrows(AlreadyExistException.class, () -> service.updateCase(entity.getId(), requestDto));
+    void testUpdateConfig_NotFound() {
+        when(repository.findById(id)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.updateConfig(id, requestDto));
     }
 
     @Test
-    void testDeleteCase_Success() {
-        when(repository.existsById(entity.getId())).thenReturn(true);
-
-        service.deleteCase(entity.getId());
-
-        verify(repository).deleteById(entity.getId());
+    void testDeleteConfig_Success() {
+        when(repository.existsById(id)).thenReturn(true);
+        service.deleteConfig(id);
+        verify(repository).deleteById(id);
     }
 
     @Test
-    void testDeleteCase_NotFound() {
-        when(repository.existsById(entity.getId())).thenReturn(false);
+    void testDeleteConfig_NotFound() {
+        when(repository.existsById(id)).thenReturn(false);
+        assertThrows(NotFoundException.class, () -> service.deleteConfig(id));
+    }
 
-        assertThrows(NotFoundException.class, () -> service.deleteCase(entity.getId()));
+    @Test
+    void testVerifyRequiredItems_AllFieldsPresent() {
+        requestDto.setNotification(NotificationType.KAFKA);
+        requestDto.setTopicUrl("topic");
+        assertDoesNotThrow(() -> service.createConfig(requestDto));
     }
 }
 
+
 package com.bnpp.pf.walle.admin.web.controller;
 
-import com.bnpp.pf.walle.admin.dto.CaseRequestDto;
-import com.bnpp.pf.walle.admin.dto.CaseResponseDto;
-import com.bnpp.pf.walle.admin.service.CaseService;
+import com.bnpp.pf.walle.admin.dto.ConfigRequestDto;
+import com.bnpp.pf.walle.admin.dto.ConfigResponseDto;
+import com.bnpp.pf.walle.admin.service.ConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -166,78 +163,76 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(CaseController.class)
-class CaseControllerTest {
+@WebMvcTest(ConfigController.class)
+class ConfigControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-
     @MockBean
-    private CaseService service;
-
+    private ConfigService service;
     @Autowired
     private ObjectMapper objectMapper;
 
-    private CaseRequestDto requestDto;
-    private CaseResponseDto responseDto;
+    private ConfigRequestDto requestDto;
+    private ConfigResponseDto responseDto;
     private UUID id;
 
     @BeforeEach
     void setUp() {
         id = UUID.randomUUID();
-        requestDto = new CaseRequestDto();
-        requestDto.setCaseName("TestCase");
+        requestDto = new ConfigRequestDto();
+        requestDto.setCaseId(id);
 
-        responseDto = new CaseResponseDto();
+        responseDto = new ConfigResponseDto();
         responseDto.setId(id);
-        responseDto.setCaseName("TestCase");
     }
 
     @Test
-    void testCreateCase() throws Exception {
-        Mockito.when(service.createCase(any())).thenReturn(responseDto);
+    void testCreateConfig() throws Exception {
+        Mockito.when(service.createConfig(any())).thenReturn(responseDto);
 
-        mockMvc.perform(post("/cases")
+        mockMvc.perform(post("/config")
+                        .header("x-authorization", "Bearer token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.caseName").value("TestCase"));
+                .andExpect(jsonPath("$.id").value(id.toString()));
     }
 
     @Test
-    void testGetAllCases() throws Exception {
-        Mockito.when(service.getAllCases()).thenReturn(List.of(responseDto));
+    void testGetAllConfigs() throws Exception {
+        Mockito.when(service.getAllConfigs()).thenReturn(List.of(responseDto));
 
-        mockMvc.perform(get("/cases"))
+        mockMvc.perform(get("/config"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].caseName").value("TestCase"));
+                .andExpect(jsonPath("$[0].id").value(id.toString()));
     }
 
     @Test
-    void testGetCaseById() throws Exception {
-        Mockito.when(service.getCaseById(eq(id))).thenReturn(responseDto);
+    void testGetConfigById() throws Exception {
+        Mockito.when(service.getConfigById(eq(id))).thenReturn(responseDto);
 
-        mockMvc.perform(get("/cases/{id}", id))
+        mockMvc.perform(get("/config/{id}", id))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.caseName").value("TestCase"));
+                .andExpect(jsonPath("$.id").value(id.toString()));
     }
 
     @Test
-    void testUpdateCase() throws Exception {
-        Mockito.when(service.updateCase(eq(id), any())).thenReturn(responseDto);
+    void testUpdateConfig() throws Exception {
+        Mockito.when(service.updateConfig(eq(id), any())).thenReturn(responseDto);
 
-        mockMvc.perform(put("/cases/{id}", id)
+        mockMvc.perform(put("/config/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.caseName").value("TestCase"));
+                .andExpect(jsonPath("$.id").value(id.toString()));
     }
 
     @Test
-    void testDeleteCase() throws Exception {
-        mockMvc.perform(delete("/cases/{id}", id))
+    void testDeleteConfig() throws Exception {
+        mockMvc.perform(delete("/config/{id}", id))
                 .andExpect(status().isNoContent());
 
-        Mockito.verify(service).deleteCase(id);
+        Mockito.verify(service).deleteConfig(id);
     }
 }
