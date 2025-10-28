@@ -1,79 +1,235 @@
+package com.bnpp.pf.walle.admin.service;
+
+import com.bnpp.pf.walle.admin.domain.CaseEntity;
+import com.bnpp.pf.walle.admin.domain.ConfigEntity;
+import com.bnpp.pf.walle.admin.dto.CaseWithConfigRequestDto;
+import com.bnpp.pf.walle.admin.dto.CaseWithConfigResponse;
 import com.bnpp.pf.walle.admin.enums.NotificationType;
 import com.bnpp.pf.walle.admin.exception.NotFoundException;
+import com.bnpp.pf.walle.admin.mapper.CaseWithConfigMapper;
+import com.bnpp.pf.walle.admin.repository.CaseRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-...
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
-@Test
-void testVerifyRequiredItems_API_AllFieldsPresent() {
-    ConfigRequestDto dto = new ConfigRequestDto();
-    dto.setNotification(NotificationType.API);
-    dto.setCallbackUrl("https://callback");
-    dto.setNotifAuthMode("BASIC");
-    dto.setAuthTokenUrl("https://auth");
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-    assertDoesNotThrow(() -> invokeVerifyRequiredItems(dto));
-}
+@ExtendWith(MockitoExtension.class)
+class CaseWithConfigServiceImplTest {
 
-@Test
-void testVerifyRequiredItems_API_MissingCallbackUrl() {
-    ConfigRequestDto dto = new ConfigRequestDto();
-    dto.setNotification(NotificationType.API);
-    dto.setNotifAuthMode("BASIC");
-    dto.setAuthTokenUrl("https://auth");
+    @Mock
+    private CaseRepository caseRepository;
 
-    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
-}
+    @Mock
+    private CaseWithConfigMapper mapper;
 
-@Test
-void testVerifyRequiredItems_API_MissingNotifAuthMode() {
-    ConfigRequestDto dto = new ConfigRequestDto();
-    dto.setNotification(NotificationType.API);
-    dto.setCallbackUrl("https://callback");
-    dto.setAuthTokenUrl("https://auth");
+    @InjectMocks
+    private CaseWithConfigServiceImpl service;
 
-    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
-}
+    private CaseWithConfigRequestDto request;
+    private CaseEntity entity;
+    private CaseWithConfigResponse response;
+    private UUID id;
 
-@Test
-void testVerifyRequiredItems_API_MissingAuthTokenUrl() {
-    ConfigRequestDto dto = new ConfigRequestDto();
-    dto.setNotification(NotificationType.API);
-    dto.setCallbackUrl("https://callback");
-    dto.setNotifAuthMode("BASIC");
+    @BeforeEach
+    void setup() {
+        id = UUID.randomUUID();
+        request = new CaseWithConfigRequestDto();
+        request.setCaseName("TestCase");
+        request.setCountry("FR");
+        request.setLanguage("EN");
+        request.setActive(true);
+        request.setRetentionPeriod(7);
+        request.setDataset(List.of("d1", "d2"));
 
-    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
-}
+        ConfigEntity cfg = new ConfigEntity();
+        cfg.setNotification(NotificationType.API);
+        cfg.setCallbackUrl("cb");
+        cfg.setAuthTokenUrl("auth");
+        cfg.setNotifAuthMode("BASIC");
 
-@Test
-void testVerifyRequiredItems_KAFKA_MissingTopicUrl() {
-    ConfigRequestDto dto = new ConfigRequestDto();
-    dto.setNotification(NotificationType.KAFKA);
+        request.setConfigs(List.of(cfg));
 
-    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
-}
+        entity = new CaseEntity();
+        entity.setId(id);
 
-@Test
-void testVerifyRequiredItems_KAFKA_AllFieldsPresent() {
-    ConfigRequestDto dto = new ConfigRequestDto();
-    dto.setNotification(NotificationType.KAFKA);
-    dto.setTopicUrl("topic-test");
+        response = new CaseWithConfigResponse();
+        response.setId(id);
+    }
 
-    assertDoesNotThrow(() -> invokeVerifyRequiredItems(dto));
-}
+    @Test
+    void testCreateCaseWithConfig_Success() {
+        when(mapper.toEntity(any())).thenReturn(entity);
+        when(caseRepository.save(any())).thenReturn(entity);
+        when(mapper.toDto(any())).thenReturn(response);
 
-/**
- * Utilitaire pour invoquer la méthode privée verifyRequiredItems via réflexion.
- */
-private void invokeVerifyRequiredItems(ConfigRequestDto dto) {
-    try {
-        var method = ConfigServiceImpl.class.getDeclaredMethod("verifyRequiredItems", ConfigRequestDto.class);
-        method.setAccessible(true);
-        method.invoke(null, dto); // méthode statique
-    } catch (Exception e) {
-        // Si l'exception est encapsulée dans InvocationTargetException, on la relance proprement
-        if (e.getCause() instanceof RuntimeException) {
-            throw (RuntimeException) e.getCause();
-        }
-        fail("Erreur lors de l'appel de verifyRequiredItems: " + e);
+        var result = service.createCaseWithConfig(request);
+
+        assertNotNull(result);
+        verify(caseRepository).save(any());
+        verify(mapper).toEntity(request);
+        verify(mapper).toDto(entity);
+    }
+
+    @Test
+    void testCreateCaseWithConfig_WithConfigs() {
+        CaseEntity caseEntity = new CaseEntity();
+        ConfigEntity cfg1 = new ConfigEntity();
+        ConfigEntity cfg2 = new ConfigEntity();
+        caseEntity.setConfig(List.of(cfg1, cfg2));
+        when(mapper.toEntity(any())).thenReturn(caseEntity);
+        when(caseRepository.save(any())).thenReturn(caseEntity);
+        when(mapper.toDto(any())).thenReturn(response);
+
+        var result = service.createCaseWithConfig(request);
+        assertNotNull(result);
+        verify(caseRepository).save(caseEntity);
+    }
+
+    @Test
+    void testUpdateCaseWithConfig_NotificationType_API() {
+        CaseEntity existing = new CaseEntity();
+        ConfigEntity cfg = new ConfigEntity();
+        cfg.setNotification(NotificationType.API);
+        cfg.setCallbackUrl("url");
+        existing.setConfig(List.of(cfg));
+
+        when(caseRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(mapper.toEntity(any())).thenReturn(existing);
+        when(caseRepository.save(any())).thenReturn(existing);
+        when(mapper.toDto(any())).thenReturn(response);
+
+        var result = service.updateCaseWithConfig(id, request);
+
+        assertNotNull(result);
+        verify(caseRepository).save(existing);
+    }
+
+    @Test
+    void testUpdateCaseWithConfig_NotificationType_KAFKA() {
+        CaseEntity existing = new CaseEntity();
+        ConfigEntity cfg = new ConfigEntity();
+        cfg.setNotification(NotificationType.KAFKA);
+        cfg.setTopicUrl("topic");
+        existing.setConfig(List.of(cfg));
+
+        when(caseRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(mapper.toEntity(any())).thenReturn(existing);
+        when(caseRepository.save(any())).thenReturn(existing);
+        when(mapper.toDto(any())).thenReturn(response);
+
+        var result = service.updateCaseWithConfig(id, request);
+
+        assertNotNull(result);
+        verify(caseRepository).save(existing);
+    }
+
+    @Test
+    void testUpdateCaseWithConfig_NotFound() {
+        when(caseRepository.findById(id)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.updateCaseWithConfig(id, request));
+    }
+
+    @Test
+    void testDeleteCaseWithConfig_Success() {
+        when(caseRepository.findById(id)).thenReturn(Optional.of(entity));
+        service.deleteCaseWithConfig(id);
+        verify(caseRepository).delete(entity);
+    }
+
+    @Test
+    void testDeleteCaseWithConfig_NotFound() {
+        when(caseRepository.findById(id)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.deleteCaseWithConfig(id));
     }
 }
+
+
+package com.bnpp.pf.walle.admin.web.controller;
+
+import com.bnpp.pf.walle.admin.dto.CaseWithConfigRequestDto;
+import com.bnpp.pf.walle.admin.dto.CaseWithConfigResponse;
+import com.bnpp.pf.walle.admin.service.CaseWithConfigService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(CaseWithConfigController.class)
+class CaseWithConfigControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private CaseWithConfigService service;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private CaseWithConfigRequestDto request;
+    private CaseWithConfigResponse response;
+    private UUID id;
+
+    @BeforeEach
+    void setup() {
+        id = UUID.randomUUID();
+        request = new CaseWithConfigRequestDto();
+        request.setCaseName("DemoCase");
+        response = new CaseWithConfigResponse();
+        response.setId(id);
+    }
+
+    @Test
+    void testCreateCaseWithConfig() throws Exception {
+        Mockito.when(service.createCaseWithConfig(any())).thenReturn(response);
+
+        mockMvc.perform(post("/cases/with-notification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(id.toString()));
+    }
+
+    @Test
+    void testUpdateCaseWithConfig() throws Exception {
+        Mockito.when(service.updateCaseWithConfig(eq(id), any())).thenReturn(response);
+
+        mockMvc.perform(put("/cases/with-notification/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
+    }
+
+    @Test
+    void testDeleteCaseWithConfig() throws Exception {
+        mockMvc.perform(delete("/cases/with-notification/{id}", id))
+                .andExpect(status().isOk());
+
+        Mockito.verify(service).deleteCaseWithConfig(id);
+    }
+}
+
