@@ -1,238 +1,79 @@
-package com.bnpp.pf.walle.admin.service;
-
-import com.bnpp.pf.walle.admin.domain.ConfigEntity;
-import com.bnpp.pf.walle.admin.dto.ConfigRequestDto;
-import com.bnpp.pf.walle.admin.dto.ConfigResponseDto;
 import com.bnpp.pf.walle.admin.enums.NotificationType;
 import com.bnpp.pf.walle.admin.exception.NotFoundException;
-import com.bnpp.pf.walle.admin.mapper.ConfigMapper;
-import com.bnpp.pf.walle.admin.repository.ConfigRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Collections;
-import java.util.Optional;
-import java.util.UUID;
+...
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+@Test
+void testVerifyRequiredItems_API_AllFieldsPresent() {
+    ConfigRequestDto dto = new ConfigRequestDto();
+    dto.setNotification(NotificationType.API);
+    dto.setCallbackUrl("https://callback");
+    dto.setNotifAuthMode("BASIC");
+    dto.setAuthTokenUrl("https://auth");
 
-@ExtendWith(MockitoExtension.class)
-class ConfigServiceImplTest {
-
-    @Mock
-    private ConfigRepository repository;
-    @Mock
-    private ConfigMapper mapper;
-    @Mock
-    private CaseRepository caseRepository;
-    @InjectMocks
-    private ConfigServiceImpl service;
-
-    private ConfigRequestDto requestDto;
-    private ConfigEntity entity;
-    private ConfigResponseDto responseDto;
-    private UUID id;
-
-    @BeforeEach
-    void setUp() {
-        id = UUID.randomUUID();
-        requestDto = new ConfigRequestDto();
-        requestDto.setCaseId(id);
-        requestDto.setNotification(NotificationType.KAFKA);
-        requestDto.setTopicUrl("topic-test");
-        requestDto.setAlgorithm("ES256");
-
-        entity = new ConfigEntity();
-        entity.setId(id);
-
-        responseDto = new ConfigResponseDto();
-        responseDto.setId(id);
-    }
-
-    @Test
-    void testCreateConfig_Success() {
-        when(caseRepository.findById(requestDto.getCaseId())).thenReturn(Optional.of(new CaseEntity()));
-        when(mapper.toEntity(requestDto)).thenReturn(entity);
-        when(repository.save(entity)).thenReturn(entity);
-        when(mapper.toDto(entity)).thenReturn(responseDto);
-
-        ConfigResponseDto result = service.createConfig(requestDto);
-
-        assertNotNull(result);
-        assertEquals(id, result.getId());
-        verify(repository).save(entity);
-    }
-
-    @Test
-    void testCreateConfig_CaseNotFound() {
-        when(caseRepository.findById(requestDto.getCaseId())).thenReturn(Optional.empty());
-        assertThrows(NotFoundException.class, () -> service.createConfig(requestDto));
-    }
-
-    @Test
-    void testGetAllConfigs() {
-        when(repository.findAll()).thenReturn(Collections.singletonList(entity));
-        when(mapper.toDto(entity)).thenReturn(responseDto);
-
-        var result = service.getAllConfigs();
-        assertEquals(1, result.size());
-        verify(repository).findAll();
-    }
-
-    @Test
-    void testGetConfigById_Found() {
-        when(repository.findById(id)).thenReturn(Optional.of(entity));
-        when(mapper.toDto(entity)).thenReturn(responseDto);
-
-        var result = service.getConfigById(id);
-        assertEquals(id, result.getId());
-    }
-
-    @Test
-    void testGetConfigById_NotFound() {
-        when(repository.findById(id)).thenReturn(Optional.empty());
-        assertThrows(NotFoundException.class, () -> service.getConfigById(id));
-    }
-
-    @Test
-    void testUpdateConfig_Success() {
-        when(repository.findById(id)).thenReturn(Optional.of(entity));
-        when(mapper.toEntity(requestDto)).thenReturn(entity);
-        when(repository.save(entity)).thenReturn(entity);
-        when(mapper.toDto(entity)).thenReturn(responseDto);
-
-        ConfigResponseDto result = service.updateConfig(id, requestDto);
-        assertNotNull(result);
-        verify(repository).save(entity);
-    }
-
-    @Test
-    void testUpdateConfig_NotFound() {
-        when(repository.findById(id)).thenReturn(Optional.empty());
-        assertThrows(NotFoundException.class, () -> service.updateConfig(id, requestDto));
-    }
-
-    @Test
-    void testDeleteConfig_Success() {
-        when(repository.existsById(id)).thenReturn(true);
-        service.deleteConfig(id);
-        verify(repository).deleteById(id);
-    }
-
-    @Test
-    void testDeleteConfig_NotFound() {
-        when(repository.existsById(id)).thenReturn(false);
-        assertThrows(NotFoundException.class, () -> service.deleteConfig(id));
-    }
-
-    @Test
-    void testVerifyRequiredItems_AllFieldsPresent() {
-        requestDto.setNotification(NotificationType.KAFKA);
-        requestDto.setTopicUrl("topic");
-        assertDoesNotThrow(() -> service.createConfig(requestDto));
-    }
+    assertDoesNotThrow(() -> invokeVerifyRequiredItems(dto));
 }
 
+@Test
+void testVerifyRequiredItems_API_MissingCallbackUrl() {
+    ConfigRequestDto dto = new ConfigRequestDto();
+    dto.setNotification(NotificationType.API);
+    dto.setNotifAuthMode("BASIC");
+    dto.setAuthTokenUrl("https://auth");
 
-package com.bnpp.pf.walle.admin.web.controller;
+    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
+}
 
-import com.bnpp.pf.walle.admin.dto.ConfigRequestDto;
-import com.bnpp.pf.walle.admin.dto.ConfigResponseDto;
-import com.bnpp.pf.walle.admin.service.ConfigService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+@Test
+void testVerifyRequiredItems_API_MissingNotifAuthMode() {
+    ConfigRequestDto dto = new ConfigRequestDto();
+    dto.setNotification(NotificationType.API);
+    dto.setCallbackUrl("https://callback");
+    dto.setAuthTokenUrl("https://auth");
 
-import java.util.List;
-import java.util.UUID;
+    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
+}
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@Test
+void testVerifyRequiredItems_API_MissingAuthTokenUrl() {
+    ConfigRequestDto dto = new ConfigRequestDto();
+    dto.setNotification(NotificationType.API);
+    dto.setCallbackUrl("https://callback");
+    dto.setNotifAuthMode("BASIC");
 
-@WebMvcTest(ConfigController.class)
-class ConfigControllerTest {
+    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
+}
 
-    @Autowired
-    private MockMvc mockMvc;
-    @MockBean
-    private ConfigService service;
-    @Autowired
-    private ObjectMapper objectMapper;
+@Test
+void testVerifyRequiredItems_KAFKA_MissingTopicUrl() {
+    ConfigRequestDto dto = new ConfigRequestDto();
+    dto.setNotification(NotificationType.KAFKA);
 
-    private ConfigRequestDto requestDto;
-    private ConfigResponseDto responseDto;
-    private UUID id;
+    assertThrows(NotFoundException.class, () -> invokeVerifyRequiredItems(dto));
+}
 
-    @BeforeEach
-    void setUp() {
-        id = UUID.randomUUID();
-        requestDto = new ConfigRequestDto();
-        requestDto.setCaseId(id);
+@Test
+void testVerifyRequiredItems_KAFKA_AllFieldsPresent() {
+    ConfigRequestDto dto = new ConfigRequestDto();
+    dto.setNotification(NotificationType.KAFKA);
+    dto.setTopicUrl("topic-test");
 
-        responseDto = new ConfigResponseDto();
-        responseDto.setId(id);
-    }
+    assertDoesNotThrow(() -> invokeVerifyRequiredItems(dto));
+}
 
-    @Test
-    void testCreateConfig() throws Exception {
-        Mockito.when(service.createConfig(any())).thenReturn(responseDto);
-
-        mockMvc.perform(post("/config")
-                        .header("x-authorization", "Bearer token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(id.toString()));
-    }
-
-    @Test
-    void testGetAllConfigs() throws Exception {
-        Mockito.when(service.getAllConfigs()).thenReturn(List.of(responseDto));
-
-        mockMvc.perform(get("/config"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(id.toString()));
-    }
-
-    @Test
-    void testGetConfigById() throws Exception {
-        Mockito.when(service.getConfigById(eq(id))).thenReturn(responseDto);
-
-        mockMvc.perform(get("/config/{id}", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()));
-    }
-
-    @Test
-    void testUpdateConfig() throws Exception {
-        Mockito.when(service.updateConfig(eq(id), any())).thenReturn(responseDto);
-
-        mockMvc.perform(put("/config/{id}", id)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()));
-    }
-
-    @Test
-    void testDeleteConfig() throws Exception {
-        mockMvc.perform(delete("/config/{id}", id))
-                .andExpect(status().isNoContent());
-
-        Mockito.verify(service).deleteConfig(id);
+/**
+ * Utilitaire pour invoquer la méthode privée verifyRequiredItems via réflexion.
+ */
+private void invokeVerifyRequiredItems(ConfigRequestDto dto) {
+    try {
+        var method = ConfigServiceImpl.class.getDeclaredMethod("verifyRequiredItems", ConfigRequestDto.class);
+        method.setAccessible(true);
+        method.invoke(null, dto); // méthode statique
+    } catch (Exception e) {
+        // Si l'exception est encapsulée dans InvocationTargetException, on la relance proprement
+        if (e.getCause() instanceof RuntimeException) {
+            throw (RuntimeException) e.getCause();
+        }
+        fail("Erreur lors de l'appel de verifyRequiredItems: " + e);
     }
 }
