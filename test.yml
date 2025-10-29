@@ -1,9 +1,2 @@
-/**
- * Cette classe doit être définie via une interface et ses implémentations.
- * En effet, le service interagit avec une source de données (ex. base de données),
- * et il doit pouvoir évoluer facilement vers une autre implémentation (ex. autre SGBD ou API externe)
- * sans impacter la couche métier.
- * 
- * Cette approche respecte le principe d'Inversion of Control (IoC) de Spring
- * et favorise une architecture modulaire, extensible et testable.
- */
+J’ai ajouté une classe BaseEntity dans le module common avec les champs id, createdAt et updatedAt.
+Fais hériter tes entités de cette classe pour éviter la duplication, et pense à utiliser Lombok pour les getters/setters.
