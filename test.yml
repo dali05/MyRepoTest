@@ -1,2 +1,10 @@
-J’ai ajouté une classe BaseEntity dans le module common avec les champs id, createdAt et updatedAt.
-Fais hériter tes entités de cette classe pour éviter la duplication, et pense à utiliser Lombok pour les getters/setters.
+@Mapper(componentModel = "spring")
+public interface EtudiantMapper {
+
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    void updateEtudiantFromDto(Etudiant source, @MappingTarget Etudiant target);
+}
+
+
+Mapping(target = "id", ignore = true) // On ne veut pas écraser l'id
+    void updateEtudiantFromDto
