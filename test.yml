@@ -1,34 +1,9 @@
-<build>
-  <plugins>
-    <plugin>
-      <groupId>org.jacoco</groupId>
-      <artifactId>jacoco-maven-plugin</artifactId>
-      <version>0.8.11</version>
-      <configuration>
-        <excludes>
-          <!-- Exclure toutes les implémentations MapStruct -->
-          <exclude>**/*MapperImpl.class</exclude>
-
-          <!-- Tu peux aussi exclure d'autres classes techniques -->
-          <exclude>**/dto/**</exclude>
-          <exclude>**/config/**</exclude>
-          <exclude>**/exception/**</exclude>
-        </excludes>
-      </configuration>
-      <executions>
-        <execution>
-          <goals>
-            <goal>prepare-agent</goal>
-          </goals>
-        </execution>
-        <execution>
-          <id>report</id>
-          <phase>verify</phase>
-          <goals>
-            <goal>report</goal>
-          </goals>
-        </execution>
-      </executions>
-    </plugin>
-  </plugins>
-</build>
+/**
+ * Cette classe doit être définie via une interface et ses implémentations.
+ * En effet, le service interagit avec une source de données (ex. base de données),
+ * et il doit pouvoir évoluer facilement vers une autre implémentation (ex. autre SGBD ou API externe)
+ * sans impacter la couche métier.
+ * 
+ * Cette approche respecte le principe d'Inversion of Control (IoC) de Spring
+ * et favorise une architecture modulaire, extensible et testable.
+ */
