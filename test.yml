@@ -1,33 +1,109 @@
-import org.springframework.stereotype.Component;
-import java.lang.reflect.Field;
+package com.bnpp.pf.walle.admin.service;
 
-@Component
-public class EntityValidator {
+import com.bnpp.pf.walle.admin.domain.CaseEntity;
+import com.bnpp.pf.walle.admin.dto.CaseRequestDto;
+import com.bnpp.pf.walle.admin.dto.CaseResponseDto;
+import com.bnpp.pf.walle.admin.exception.AlreadyExistsException;
+import com.bnpp.pf.walle.admin.exception.InvalidRequestBodyException;
+import com.bnpp.pf.walle.admin.exception.NotFoundException;
+import com.bnpp.pf.walle.admin.mapper.CaseMapper;
+import com.bnpp.pf.walle.admin.repository.CaseRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
-    public void validate(Object entity, String... requiredFields) {
-        if (entity == null) {
-            throw new IllegalArgumentException("Entity must not be null.");
-        }
+import java.util.Optional;
+import java.util.UUID;
 
-        for (String fieldName : requiredFields) {
-            try {
-                Field field = entity.getClass().getDeclaredField(fieldName);
-                field.setAccessible(true);
-                Object value = field.get(entity);
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-                if (value == null || (value instanceof String && ((String) value).isBlank())) {
-                    throw new IllegalArgumentException(
-                        String.format("Field '%s' in %s must not be null or empty.", fieldName, entity.getClass().getSimpleName())
-                    );
-                }
+@ExtendWith(MockitoExtension.class)
+class CaseServiceImplUpdateCaseTest {
 
-            } catch (NoSuchFieldException e) {
-                throw new IllegalArgumentException(
-                    String.format("Field '%s' does not exist in class %s.", fieldName, entity.getClass().getSimpleName())
-                );
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException("Error accessing field: " + fieldName, e);
-            }
-        }
+    @Mock
+    private CaseRepository caseRepository;
+
+    @Mock
+    private CaseMapper mapper;
+
+    @InjectMocks
+    private CaseServiceImpl service;
+
+    private CaseRequestDto dto;
+    private CaseEntity entity;
+    private CaseResponseDto response;
+
+    private UUID id;
+
+    @BeforeEach
+    void setUp() {
+        id = UUID.randomUUID();
+        dto = new CaseRequestDto();
+        dto.setId(id);
+        dto.setName("Case A");
+
+        entity = new CaseEntity();
+        entity.setId(id);
+        entity.setCaseName("Case A");
+
+        response = new CaseResponseDto();
+        response.setId(id);
+        response.setCaseName("Case A");
+    }
+
+    /** 1️⃣ Cas : id == null */
+    @Test
+    void testUpdateCase_IdNull_ThrowsInvalidRequestBodyException() {
+        dto.setId(null);
+
+        assertThrows(InvalidRequestBodyException.class, () -> service.updateCase(dto));
+
+        verifyNoInteractions(caseRepository);
+        verifyNoInteractions(mapper);
+    }
+
+    /** 2️⃣ Cas : case introuvable */
+    @Test
+    void testUpdateCase_CaseNotFound_ThrowsNotFoundException() {
+        when(caseRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> service.updateCase(dto));
+
+        verify(caseRepository).findById(id);
+        verifyNoMoreInteractions(caseRepository);
+    }
+
+    /** 3️⃣ Cas : succès complet */
+    @Test
+    void testUpdateCase_Success() {
+        when(caseRepository.findById(id)).thenReturn(Optional.of(entity));
+        when(mapper.toEntity(dto)).thenReturn(entity);
+        when(caseRepository.save(entity)).thenReturn(entity);
+        when(mapper.toDto(entity)).thenReturn(response);
+
+        CaseResponseDto result = service.updateCase(dto);
+
+        assertNotNull(result);
+        assertEquals(id, result.getId());
+        assertEquals("Case A", result.getCaseName());
+        verify(caseRepository).save(entity);
+    }
+
+    /** 4️⃣ Cas : DataIntegrityViolationException → AlreadyExistsException */
+    @Test
+    void testUpdateCase_AlreadyExists() {
+        when(caseRepository.findById(id)).thenReturn(Optional.of(entity));
+        when(mapper.toEntity(dto)).thenReturn(entity);
+        when(caseRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+
+        assertThrows(AlreadyExistsException.class, () -> service.updateCase(dto));
+
+        verify(caseRepository).save(any());
     }
 }
