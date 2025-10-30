@@ -1,10 +1,33 @@
-@Mapper(componentModel = "spring")
-public interface EtudiantMapper {
+import org.springframework.stereotype.Component;
+import java.lang.reflect.Field;
 
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    void updateEtudiantFromDto(Etudiant source, @MappingTarget Etudiant target);
+@Component
+public class EntityValidator {
+
+    public void validate(Object entity, String... requiredFields) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Entity must not be null.");
+        }
+
+        for (String fieldName : requiredFields) {
+            try {
+                Field field = entity.getClass().getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(entity);
+
+                if (value == null || (value instanceof String && ((String) value).isBlank())) {
+                    throw new IllegalArgumentException(
+                        String.format("Field '%s' in %s must not be null or empty.", fieldName, entity.getClass().getSimpleName())
+                    );
+                }
+
+            } catch (NoSuchFieldException e) {
+                throw new IllegalArgumentException(
+                    String.format("Field '%s' does not exist in class %s.", fieldName, entity.getClass().getSimpleName())
+                );
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException("Error accessing field: " + fieldName, e);
+            }
+        }
+    }
 }
-
-
-Mapping(target = "id", ignore = true) // On ne veut pas écraser l'id
-    void updateEtudiantFromDto
