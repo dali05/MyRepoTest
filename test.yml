@@ -1,109 +1,70 @@
-package com.bnpp.pf.walle.admin.service;
+package com.bnpp.pf.walle.admin.utils;
 
-import com.bnpp.pf.walle.admin.domain.CaseEntity;
-import com.bnpp.pf.walle.admin.dto.CaseRequestDto;
-import com.bnpp.pf.walle.admin.dto.CaseResponseDto;
-import com.bnpp.pf.walle.admin.exception.AlreadyExistsException;
-import com.bnpp.pf.walle.admin.exception.InvalidRequestBodyException;
-import com.bnpp.pf.walle.admin.exception.NotFoundException;
-import com.bnpp.pf.walle.admin.mapper.CaseMapper;
-import com.bnpp.pf.walle.admin.repository.CaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
-import java.util.Optional;
-import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-class CaseServiceImplUpdateCaseTest {
+class StringListConverterTest {
 
-    @Mock
-    private CaseRepository caseRepository;
-
-    @Mock
-    private CaseMapper mapper;
-
-    @InjectMocks
-    private CaseServiceImpl service;
-
-    private CaseRequestDto dto;
-    private CaseEntity entity;
-    private CaseResponseDto response;
-
-    private UUID id;
+    private StringListConverter converter;
 
     @BeforeEach
     void setUp() {
-        id = UUID.randomUUID();
-        dto = new CaseRequestDto();
-        dto.setId(id);
-        dto.setName("Case A");
-
-        entity = new CaseEntity();
-        entity.setId(id);
-        entity.setCaseName("Case A");
-
-        response = new CaseResponseDto();
-        response.setId(id);
-        response.setCaseName("Case A");
+        converter = new StringListConverter();
     }
 
-    /** 1️⃣ Cas : id == null */
+    /** ✅ Cas 1 : liste normale -> chaîne jointe */
     @Test
-    void testUpdateCase_IdNull_ThrowsInvalidRequestBodyException() {
-        dto.setId(null);
-
-        assertThrows(InvalidRequestBodyException.class, () -> service.updateCase(dto));
-
-        verifyNoInteractions(caseRepository);
-        verifyNoInteractions(mapper);
+    void testConvertToDatabaseColumn_WithValues() {
+        List<String> input = List.of("apple", "banana", "cherry");
+        String result = converter.convertToDatabaseColumn(input);
+        assertEquals("apple;banana;cherry", result);
     }
 
-    /** 2️⃣ Cas : case introuvable */
+    /** ✅ Cas 2 : liste vide -> chaîne vide */
     @Test
-    void testUpdateCase_CaseNotFound_ThrowsNotFoundException() {
-        when(caseRepository.findById(id)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class, () -> service.updateCase(dto));
-
-        verify(caseRepository).findById(id);
-        verifyNoMoreInteractions(caseRepository);
+    void testConvertToDatabaseColumn_EmptyList() {
+        List<String> input = List.of();
+        String result = converter.convertToDatabaseColumn(input);
+        assertEquals("", result);
     }
 
-    /** 3️⃣ Cas : succès complet */
+    /** ✅ Cas 3 : liste nulle -> chaîne vide */
     @Test
-    void testUpdateCase_Success() {
-        when(caseRepository.findById(id)).thenReturn(Optional.of(entity));
-        when(mapper.toEntity(dto)).thenReturn(entity);
-        when(caseRepository.save(entity)).thenReturn(entity);
-        when(mapper.toDto(entity)).thenReturn(response);
-
-        CaseResponseDto result = service.updateCase(dto);
-
-        assertNotNull(result);
-        assertEquals(id, result.getId());
-        assertEquals("Case A", result.getCaseName());
-        verify(caseRepository).save(entity);
+    void testConvertToDatabaseColumn_NullList() {
+        String result = converter.convertToDatabaseColumn(null);
+        assertEquals("", result);
     }
 
-    /** 4️⃣ Cas : DataIntegrityViolationException → AlreadyExistsException */
+    /** ✅ Cas 4 : chaîne jointe -> liste de valeurs */
     @Test
-    void testUpdateCase_AlreadyExists() {
-        when(caseRepository.findById(id)).thenReturn(Optional.of(entity));
-        when(mapper.toEntity(dto)).thenReturn(entity);
-        when(caseRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+    void testConvertToEntityAttribute_WithValues() {
+        String input = "dog;cat;bird";
+        List<String> result = converter.convertToEntityAttribute(input);
+        assertEquals(List.of("dog", "cat", "bird"), result);
+    }
 
-        assertThrows(AlreadyExistsException.class, () -> service.updateCase(dto));
+    /** ✅ Cas 5 : chaîne vide -> liste vide */
+    @Test
+    void testConvertToEntityAttribute_EmptyString() {
+        List<String> result = converter.convertToEntityAttribute("");
+        assertTrue(result.isEmpty());
+    }
 
-        verify(caseRepository).save(any());
+    /** ✅ Cas 6 : chaîne nulle -> liste vide */
+    @Test
+    void testConvertToEntityAttribute_NullString() {
+        List<String> result = converter.convertToEntityAttribute(null);
+        assertTrue(result.isEmpty());
+    }
+
+    /** ✅ Cas 7 : chaîne avec espaces (blank) -> liste vide */
+    @Test
+    void testConvertToEntityAttribute_BlankString() {
+        List<String> result = converter.convertToEntityAttribute("   ");
+        assertTrue(result.isEmpty());
     }
 }
