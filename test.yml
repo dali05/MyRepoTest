@@ -1,70 +1,24 @@
-package com.bnpp.pf.walle.admin.utils;
+package com.bnpp.pf.common.api.exception;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class StringListConverterTest {
+class InvalidRequestBodyExceptionTest {
 
-    private StringListConverter converter;
+    @Test
+    void testExceptionMessage() {
+        String message = "Invalid body data";
+        InvalidRequestBodyException exception = new InvalidRequestBodyException(message);
 
-    @BeforeEach
-    void setUp() {
-        converter = new StringListConverter();
+        assertNotNull(exception);
+        assertTrue(exception instanceof RuntimeException);
+        assertEquals(message, exception.getMessage());
     }
 
-    /** ✅ Cas 1 : liste normale -> chaîne jointe */
     @Test
-    void testConvertToDatabaseColumn_WithValues() {
-        List<String> input = List.of("apple", "banana", "cherry");
-        String result = converter.convertToDatabaseColumn(input);
-        assertEquals("apple;banana;cherry", result);
-    }
-
-    /** ✅ Cas 2 : liste vide -> chaîne vide */
-    @Test
-    void testConvertToDatabaseColumn_EmptyList() {
-        List<String> input = List.of();
-        String result = converter.convertToDatabaseColumn(input);
-        assertEquals("", result);
-    }
-
-    /** ✅ Cas 3 : liste nulle -> chaîne vide */
-    @Test
-    void testConvertToDatabaseColumn_NullList() {
-        String result = converter.convertToDatabaseColumn(null);
-        assertEquals("", result);
-    }
-
-    /** ✅ Cas 4 : chaîne jointe -> liste de valeurs */
-    @Test
-    void testConvertToEntityAttribute_WithValues() {
-        String input = "dog;cat;bird";
-        List<String> result = converter.convertToEntityAttribute(input);
-        assertEquals(List.of("dog", "cat", "bird"), result);
-    }
-
-    /** ✅ Cas 5 : chaîne vide -> liste vide */
-    @Test
-    void testConvertToEntityAttribute_EmptyString() {
-        List<String> result = converter.convertToEntityAttribute("");
-        assertTrue(result.isEmpty());
-    }
-
-    /** ✅ Cas 6 : chaîne nulle -> liste vide */
-    @Test
-    void testConvertToEntityAttribute_NullString() {
-        List<String> result = converter.convertToEntityAttribute(null);
-        assertTrue(result.isEmpty());
-    }
-
-    /** ✅ Cas 7 : chaîne avec espaces (blank) -> liste vide */
-    @Test
-    void testConvertToEntityAttribute_BlankString() {
-        List<String> result = converter.convertToEntityAttribute("   ");
-        assertTrue(result.isEmpty());
+    void testExceptionWithNullMessage() {
+        InvalidRequestBodyException exception = new InvalidRequestBodyException(null);
+        assertNull(exception.getMessage());
     }
 }
