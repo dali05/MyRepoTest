@@ -1,24 +1,68 @@
 package com.bnpp.pf.common.api.exception;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.context.request.WebRequest;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-class InvalidRequestBodyExceptionTest {
+class GlobalExceptionHandlerTest {
 
-    @Test
-    void testExceptionMessage() {
-        String message = "Invalid body data";
-        InvalidRequestBodyException exception = new InvalidRequestBodyException(message);
+    private GlobalExceptionHandler handler;
+    private WebRequest request;
 
-        assertNotNull(exception);
-        assertTrue(exception instanceof RuntimeException);
-        assertEquals(message, exception.getMessage());
+    @BeforeEach
+    void setUp() {
+        handler = new GlobalExceptionHandler();
+        request = mock(WebRequest.class);
     }
 
+    /** ✅ Cas 1 : MissingRequestHeaderException */
     @Test
-    void testExceptionWithNullMessage() {
-        InvalidRequestBodyException exception = new InvalidRequestBodyException(null);
-        assertNull(exception.getMessage());
+    void testHandleMissingHeader() {
+        MissingRequestHeaderException ex =
+                new MissingRequestHeaderException("X-Auth-Token", null);
+
+        ResponseEntity<?> response = handler.handleMissingHeader(ex, request);
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertTrue(response.getBody().toString().contains("Required header is missing"));
+    }
+
+    /** ✅ Cas 2 : InvalidRequestBodyException */
+    @Test
+    void testHandleInvalidRequestBody() {
+        InvalidRequestBodyException ex =
+                new InvalidRequestBodyException("Body is invalid");
+
+        ResponseEntity<?> response = handler.handleInvalidRequestBody(ex, request);
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertTrue(response.getBody().toString().contains("Body is invalid"));
+    }
+
+    /** ✅ Cas 3 : AlreadyExistsException */
+    @Test
+    void testHandleAlreadyExistsException() {
+        AlreadyExistsException ex =
+                new AlreadyExistsException("Entity already exists");
+
+        ResponseEntity<?> response = handler.handleAlreadyExistsException(ex, request);
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertTrue(response.getBody().toString().contains("Entity already exists"));
     }
 }
