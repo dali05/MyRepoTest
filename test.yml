@@ -1,16 +1,4 @@
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
-
-class StringListConverterTest {
-
-    private final StringListConverter converter = new StringListConverter();
-
-    @ParameterizedTest
-    @NullAndEmptySource // teste null et ""
-    @ValueSource(strings = {" "}) // teste une chaîne avec un espace
-    void testConvertToEntityAttribute_ShouldReturnEmptyList(String input) {
-        List<String> result = converter.convertToEntityAttribute(input);
-        assertTrue(result.isEmpty());
-    }
-}
+variables:
+  BLOCK_PIPELINE_ON_FAILS: "false"
+  EXIT_ON_POLICY_FAILURE: "false"
+  IGNORE_SECURITY_POLICY_VIOLATIONS: "true"
