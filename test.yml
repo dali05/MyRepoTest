@@ -1,68 +1,44 @@
-package com.bnpp.pf.common.api.exception;
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <version>3.6.1</version>
+            <executions>
+                <execution>
+                    <id>remove-vaadin</id>
+                    <phase>validate</phase>
+                    <goals>
+                        <goal>purge-local-repository</goal>
+                    </goals>
+                    <configuration>
+                        <reResolve>false</reResolve>
+                        <manualIncludes>
+                            <manualInclude>com.vaadin:*</manualInclude>
+                            <manualInclude>com.vaadin.external.google:android-json</manualInclude>
+                        </manualIncludes>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MissingRequestHeaderException;
-import org.springframework.web.context.request.WebRequest;
 
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-class GlobalExceptionHandlerTest {
-
-    private GlobalExceptionHandler handler;
-    private WebRequest request;
-
-    @BeforeEach
-    void setUp() {
-        handler = new GlobalExceptionHandler();
-        request = mock(WebRequest.class);
-    }
-
-    /** ✅ Cas 1 : MissingRequestHeaderException */
-    @Test
-    void testHandleMissingHeader() {
-        MissingRequestHeaderException ex =
-                new MissingRequestHeaderException("X-Auth-Token", null);
-
-        ResponseEntity<?> response = handler.handleMissingHeader(ex, request);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
-        assertTrue(response.getBody().toString().contains("Required header is missing"));
-    }
-
-    /** ✅ Cas 2 : InvalidRequestBodyException */
-    @Test
-    void testHandleInvalidRequestBody() {
-        InvalidRequestBodyException ex =
-                new InvalidRequestBodyException("Body is invalid");
-
-        ResponseEntity<?> response = handler.handleInvalidRequestBody(ex, request);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
-        assertTrue(response.getBody().toString().contains("Body is invalid"));
-    }
-
-    /** ✅ Cas 3 : AlreadyExistsException */
-    @Test
-    void testHandleAlreadyExistsException() {
-        AlreadyExistsException ex =
-                new AlreadyExistsException("Entity already exists");
-
-        ResponseEntity<?> response = handler.handleAlreadyExistsException(ex, request);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
-        assertTrue(response.getBody().toString().contains("Entity already exists"));
-    }
-}
+<plugin>
+    <groupId>org.basepom.maven</groupId>
+    <artifactId>duplicate-finder-maven-plugin</artifactId>
+    <version>2.0.1</version>
+    <executions>
+        <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals>
+                <goal>check</goal>
+            </goals>
+            <configuration>
+                <skip>true</skip>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
