@@ -1,44 +1,31 @@
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <version>3.6.1</version>
-            <executions>
-                <execution>
-                    <id>remove-vaadin</id>
-                    <phase>validate</phase>
-                    <goals>
-                        <goal>purge-local-repository</goal>
-                    </goals>
-                    <configuration>
-                        <reResolve>false</reResolve>
-                        <manualIncludes>
-                            <manualInclude>com.vaadin:*</manualInclude>
-                            <manualInclude>com.vaadin.external.google:android-json</manualInclude>
-                        </manualIncludes>
-                    </configuration>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
-</build>
+<dependencyManagement>
+    <dependencies>
+        <!-- Neutraliser toute dépendance android-json -->
+        <dependency>
+            <groupId>com.vaadin.external.google</groupId>
+            <artifactId>android-json</artifactId>
+            <version>0</version>
+            <scope>provided</scope>
+        </dependency>
 
-
-<plugin>
-    <groupId>org.basepom.maven</groupId>
-    <artifactId>duplicate-finder-maven-plugin</artifactId>
-    <version>2.0.1</version>
-    <executions>
-        <execution>
-            <id>check</id>
-            <phase>verify</phase>
-            <goals>
-                <goal>check</goal>
-            </goals>
-            <configuration>
-                <skip>true</skip>
-            </configuration>
-        </execution>
-    </executions>
-</plugin>
+        <!-- Neutraliser toutes les libs Vaadin -->
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-shared</artifactId>
+            <version>0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-server</artifactId>
+            <version>0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-client</artifactId>
+            <version>0</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
