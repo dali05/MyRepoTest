@@ -1,31 +1,25 @@
-<dependencyManagement>
-    <dependencies>
-        <!-- Neutraliser toute dépendance android-json -->
-        <dependency>
-            <groupId>com.vaadin.external.google</groupId>
-            <artifactId>android-json</artifactId>
-            <version>0</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- Neutraliser toutes les libs Vaadin -->
-        <dependency>
-            <groupId>com.vaadin</groupId>
-            <artifactId>vaadin-shared</artifactId>
-            <version>0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
+<dependency>
+    <groupId>com.bnp.pf.walle</groupId>
+    <artifactId>walle-spring-common</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <exclusions>
+        <!-- Exclure toutes les dépendances Vaadin -->
+        <exclusion>
             <groupId>com.vaadin</groupId>
             <artifactId>vaadin-server</artifactId>
-            <version>0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
+        </exclusion>
+        <exclusion>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-shared</artifactId>
+        </exclusion>
+        <exclusion>
             <groupId>com.vaadin</groupId>
             <artifactId>vaadin-client</artifactId>
-            <version>0</version>
-            <scope>provided</scope>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
+        </exclusion>
+        <!-- Exclure la dépendance JSON de Vaadin -->
+        <exclusion>
+            <groupId>com.vaadin.external.google</groupId>
+            <artifactId>android-json</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
