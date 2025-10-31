@@ -1,25 +1,20 @@
-<dependency>
-    <groupId>com.bnp.pf.walle</groupId>
-    <artifactId>walle-spring-common</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <exclusions>
-        <!-- Exclure toutes les dépendances Vaadin -->
-        <exclusion>
-            <groupId>com.vaadin</groupId>
-            <artifactId>vaadin-server</artifactId>
-        </exclusion>
-        <exclusion>
-            <groupId>com.vaadin</groupId>
-            <artifactId>vaadin-shared</artifactId>
-        </exclusion>
-        <exclusion>
-            <groupId>com.vaadin</groupId>
-            <artifactId>vaadin-client</artifactId>
-        </exclusion>
-        <!-- Exclure la dépendance JSON de Vaadin -->
-        <exclusion>
-            <groupId>com.vaadin.external.google</groupId>
-            <artifactId>android-json</artifactId>
-        </exclusion>
-    </exclusions>
-</dependency>
+@Transactional
+public CaseWithConfigResponse createCaseWithConfig(@Valid CaseWithConfigRequestDto req) {
+    // 1️⃣ Convertir la requête en entité
+    CaseEntity caseEntity = mapper.toEntity(req);
+
+    // 2️⃣ Sauvegarder d’abord le CaseEntity seul pour qu’il ait un ID
+    CaseEntity savedCase = caseRepository.save(caseEntity);
+
+    // 3️⃣ Ajouter les configs et leur attribuer le caseId
+    if (req.getConfigs() != null) {
+        for (ConfigEntity config : req.getConfigs()) {
+            config.setCaseId(savedCase.getId());
+        }
+        configRepository.saveAll(req.getConfigs());
+        savedCase.setConfigs(req.getConfigs());
+    }
+
+    // 4️⃣ Retourner le DTO final
+    return mapper.toDto(savedCase);
+}
