@@ -1,20 +1,11 @@
-@Transactional
-public CaseWithConfigResponse createCaseWithConfig(@Valid CaseWithConfigRequestDto req) {
-    // 1️⃣ Convertir la requête en entité
-    CaseEntity caseEntity = mapper.toEntity(req);
-
-    // 2️⃣ Sauvegarder d’abord le CaseEntity seul pour qu’il ait un ID
-    CaseEntity savedCase = caseRepository.save(caseEntity);
-
-    // 3️⃣ Ajouter les configs et leur attribuer le caseId
-    if (req.getConfigs() != null) {
-        for (ConfigEntity config : req.getConfigs()) {
-            config.setCaseId(savedCase.getId());
-        }
-        configRepository.saveAll(req.getConfigs());
-        savedCase.setConfigs(req.getConfigs());
-    }
-
-    // 4️⃣ Retourner le DTO final
-    return mapper.toDto(savedCase);
+@SuppressWarnings("javaarchitecture:S7027")
+@Entity
+@Table(name = "config", schema = "admduan")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder
+public class ConfigEntity extends BaseEntity {
+    ...
 }
